@@ -1,6 +1,5 @@
 <img src="https://github.com/GTAmodding/re3/blob/miami/res/images/logo_1024.png?raw=true" alt="reVC logo" width="200">
 
-[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2FGTAmodding%2Fre3%2Fbadge%3Fref%3Dmiami&style=flat)](https://actions-badge.atrox.dev/GTAmodding/re3/goto?ref=miami)
 <a href="https://discord.gg/RFNbjsUMGg"><img src="https://img.shields.io/badge/discord-join-7289DA.svg?logo=discord&longCache=true&style=flat" /></a>
 
 ## About this fork
@@ -9,7 +8,7 @@ Fork of re3/reVC with physics fixes for high framerates. Vehicle wheel spin, gri
 
 ## Intro
 
-In this repository you'll find the fully reversed source code for GTA III ([master](https://github.com/GTAmodding/re3/tree/master/) branch) and GTA VC ([miami](https://github.com/GTAmodding/re3/tree/miami/) branch).
+This fork contains the fully reversed source code for GTA VC ([miami](https://github.com/Ogstra/re3/tree/miami/) branch), based on [re3 by GTAmodding](https://github.com/GTAmodding/re3).
 
 It has been tested and works on Windows, Linux, MacOS and FreeBSD, on x86, amd64, arm and arm64.\
 Rendering is handled either by original RenderWare (D3D8)
@@ -21,12 +20,7 @@ We cannot build for PS2 or Xbox yet. If you're interested in doing so, get in to
 ## Installation
 
 - reVC requires game assets to work, so you **must** own [a copy of GTA Vice City](https://store.steampowered.com/app/12110/Grand_Theft_Auto_Vice_City/).
-- Build reVC or download the latest build:
-  - [Windows D3D9 MSS 32bit](https://nightly.link/GTAmodding/re3/workflows/reVC_msvc_x86/miami/reVC_Release_win-x86-librw_d3d9-mss.zip)
-  - [Windows D3D9 64bit](https://nightly.link/GTAmodding/re3/workflows/reVC_msvc_amd64/miami/reVC_Release_win-amd64-librw_d3d9-oal.zip)
-  - [Windows OpenGL 64bit](https://nightly.link/GTAmodding/re3/workflows/reVC_msvc_amd64/miami/reVC_Release_win-amd64-librw_gl3_glfw-oal.zip)
-  - [Linux 64bit](https://nightly.link/GTAmodding/re3/workflows/build-cmake-conan/miami/ubuntu-18.04-gl3.zip)
-  - [MacOS 64bit x86-64](https://nightly.link/GTAmodding/re3/workflows/build-cmake-conan/miami/macos-latest-gl3.zip)
+- Build reVC from source (see below) or download upstream builds from [GTAmodding/re3](https://github.com/GTAmodding/re3/tree/miami) (note: those builds do not include the physics fixes from this fork).
 - Extract the downloaded zip over your GTA VC directory and run reVC. The zip includes the binary, updated and additional gamefiles and in case of OpenAL the required dlls.
 
 ## Screenshots
@@ -70,7 +64,6 @@ Some of them can be toggled at runtime, some cannot.
 
 The following things would be nice to have/do:
 
-* Fix physics for high FPS
 * Improve performance on lower end devices, especially the OpenGL layer on the Raspberry Pi (if you have experience with this, please get in touch)
 * [PS2 port](https://github.com/GTAmodding/re3/wiki/PS2-port)
 * Xbox port (not quite as important)
@@ -91,7 +84,7 @@ Sorry for the inconvenience.
 
 When using premake, you may want to point GTA_VC_RE_DIR environment variable to GTA Vice City root folder if you want the executable to be moved there via post-build script.
 
-Clone the repository with `git clone --recursive -b miami https://github.com/GTAmodding/re3.git reVC`. Then `cd reVC` into the cloned repository.
+Clone the repository with `git clone --recursive https://github.com/Ogstra/re3.git reVC`. Then `cd reVC` into the cloned repository.
 
 <details><summary>Linux Premake</summary>
 
