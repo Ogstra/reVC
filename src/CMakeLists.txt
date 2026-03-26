@@ -54,6 +54,10 @@ target_compile_definitions(${EXECUTABLE} PRIVATE USE_OUR_VERSIONING)
 
 if(${PROJECT}_AUDIO STREQUAL "OAL")
     find_package(OpenAL REQUIRED)
+    if(APPLE AND EXISTS "${PROJECT_SOURCE_DIR}/vendor/openal-soft/include/AL/efx.h")
+        # Apple's OpenAL framework does not provide efx.h. Use vendored headers for EFX declarations.
+        target_include_directories(${EXECUTABLE} PRIVATE "${PROJECT_SOURCE_DIR}/vendor/openal-soft/include")
+    endif()
     if(TARGET OpenAL::OpenAL)
         target_link_libraries(${EXECUTABLE} PRIVATE OpenAL::OpenAL)
     else()

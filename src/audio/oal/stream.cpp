@@ -1257,15 +1257,24 @@ bool CStream::Open(const char* filename, uint32 overrideSampleRate)
 // Be case-insensitive on linux (from https://github.com/OneSadCookie/fcaseopen/)
 #if !defined(_WIN32)
 	char *real = casepath(filename);
-	if (real) {
-		strcpy(m_aFilename, real);
-		free(real);
-	} else {
+	const char *streamPath = real ? real : filename;
 #else
-	{
+	const char *streamPath = filename;
 #endif
-		strcpy(m_aFilename, filename);
+
+	if (strlen(streamPath) >= sizeof(m_aFilename)) {
+		DEV("Stream path too long (%zu), ignoring: %s\n", strlen(streamPath), streamPath);
+#if !defined(_WIN32)
+		if (real)
+			free(real);
+#endif
+		return false;
 	}
+	strcpy(m_aFilename, streamPath);
+#if !defined(_WIN32)
+	if (real)
+		free(real);
+#endif
 		
 	DEV("Stream %s\n", m_aFilename);
 

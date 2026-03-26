@@ -2,7 +2,17 @@
 
 #ifdef AUDIO_OAL
 #include "eax.h"
-#include "AL/efx.h"
+#if defined(__has_include)
+#if __has_include(<AL/efx.h>)
+#include <AL/efx.h>
+#elif __has_include(<OpenAL/efx.h>)
+#include <OpenAL/efx.h>
+#else
+#error "OpenAL EFX header not found"
+#endif
+#else
+#include <AL/efx.h>
+#endif
 
 
 void EFXInit();

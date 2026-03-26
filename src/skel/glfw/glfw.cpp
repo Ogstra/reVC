@@ -865,11 +865,18 @@ psSelectDevice()
 			}
 		}
 
-		if(bestFsMode < 0){
-			printf("WARNING: Cannot find desired video mode, selecting device cancelled\n");
-			return FALSE;
-		}
-		GcurSelVM = bestFsMode;
+			if(bestFsMode < 0){
+				// macOS/GLFW can expose only windowed modes. Fallback to windowed instead of aborting startup.
+				if(bestWndMode >= 0){
+					printf("WARNING: Cannot find desired fullscreen video mode, falling back to windowed mode\n");
+					FrontEndMenuManager.m_nPrefsWindowed = 1;
+					GcurSelVM = bestWndMode;
+				}else{
+					printf("WARNING: Cannot find desired video mode, selecting device cancelled\n");
+					return FALSE;
+				}
+			}else
+				GcurSelVM = bestFsMode;
 
 		FrontEndMenuManager.m_nDisplayVideoMode = GcurSelVM;
 		FrontEndMenuManager.m_nPrefsVideoMode = FrontEndMenuManager.m_nDisplayVideoMode;

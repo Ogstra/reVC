@@ -2,7 +2,17 @@
 
 #ifdef AUDIO_OAL
 #include "oal/oal_utils.h"
+#if defined(__has_include)
+#if __has_include(<AL/al.h>)
 #include <AL/al.h>
+#elif __has_include(<OpenAL/al.h>)
+#include <OpenAL/al.h>
+#else
+#include <AL/al.h>
+#endif
+#else
+#include <AL/al.h>
+#endif
 #include <AL/alext.h>
 #include <AL/efx.h>
 
@@ -20,7 +30,12 @@ class CChannel
 	int32  LoopCount;
 	ALint  LoopPoints[2];
 	ALint  LastProcessedOffset;
+	bool   bServiceActive;
 	bool   bIs2D;
+	static bool bHasSoftLoopPoints;
+	ALint GetEffectiveLoopEnd() const;
+	bool HasValidCustomLoopPoints() const;
+	void UpdateServiceState();
 public:
 	static int32 channelsThatNeedService;
 

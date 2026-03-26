@@ -16,6 +16,7 @@ ALuint alBuffers[NUM_CHANNELS];
 bool bChannelsCreated = false;
 
 int32 CChannel::channelsThatNeedService = 0;
+bool CChannel::bHasSoftLoopPoints = false;
 
 uint8 tempStereoBuffer[PED_BLOCKSIZE * 2];
 
@@ -24,6 +25,7 @@ CChannel::InitChannels()
 {
 	alGenSources(NUM_CHANNELS, alSources);
 	alGenBuffers(NUM_CHANNELS, alBuffers);
+	bHasSoftLoopPoints = alIsExtensionPresent("AL_SOFT_loop_points") == AL_TRUE;
 	if (IsFXSupported())
 		alGenFilters(NUM_CHANNELS, alFilters);
 	bChannelsCreated = true;
@@ -52,6 +54,7 @@ CChannel::CChannel()
 {
 	Data = nil;
 	DataSize = 0;
+	bServiceActive = false;
 	bIs2D = false;
 	SetDefault();
 }
@@ -75,8 +78,10 @@ void CChannel::SetDefault()
 void CChannel::Reset()
 {
 	// Here is safe because ctor don't call this
-	if (LoopCount > 1)
+	if (bServiceActive) {
 		channelsThatNeedService--;
+		bServiceActive = false;
+	}
 
 	ClearBuffer();
 	SetDefault();
@@ -131,8 +136,10 @@ void CChannel::Start()
 	}
 	else
 		alBufferData(alBuffers[id], AL_FORMAT_MONO16, Data, DataSize, Frequency);
-	if ( LoopPoints[0] != 0 && LoopPoints[0] != -1 )
-		alBufferiv(alBuffers[id], AL_LOOP_POINTS_SOFT, LoopPoints);
+	if (bHasSoftLoopPoints && HasValidCustomLoopPoints()) {
+		ALint points[2] = { LoopPoints[0], GetEffectiveLoopEnd() };
+		alBufferiv(alBuffers[id], AL_LOOP_POINTS_SOFT, points);
+	}
 	alSourcei(alSources[id], AL_BUFFER, alBuffers[id]);
 	alSourcePlay(alSources[id]);
 }
@@ -195,20 +202,35 @@ void CChannel::SetLoopCount(int32 count)
 	if ( !HasSource() ) return;
 
 	// 0: loop indefinitely, 1: play one time, 2: play two times etc...
-	// only > 1 needs manual processing
-
-	if (LoopCount > 1 && count < 2)
-		channelsThatNeedService--;
-	else if (LoopCount < 2 && count > 1)
-		channelsThatNeedService++;
-
-	alSourcei(alSources[id], AL_LOOPING, count == 1 ? AL_FALSE : AL_TRUE);
+	// without AL_SOFT_loop_points we keep infinite loops in software for stability
+	bool useSoftwareLooping = count == 0 && !bHasSoftLoopPoints;
+	alSourcei(alSources[id], AL_LOOPING, (count != 1 && !useSoftwareLooping) ? AL_TRUE : AL_FALSE);
 	LoopCount = count;
+	UpdateServiceState();
 }
 
 bool CChannel::Update()
 {
 	if (!HasSource()) return false;
+	bool serviceSoftwareLoop = LoopCount == 0 && !bHasSoftLoopPoints;
+	if (serviceSoftwareLoop) {
+		ALint state;
+		alGetSourcei(alSources[id], AL_SOURCE_STATE, &state);
+		if (state == AL_STOPPED) {
+			ALint loopStart = HasValidCustomLoopPoints() ? LoopPoints[0] : 0;
+			alSourcei(alSources[id], AL_SAMPLE_OFFSET, loopStart);
+			alSourcePlay(alSources[id]);
+			return true;
+		}
+
+		if (HasValidCustomLoopPoints()) {
+			ALint offset;
+			alGetSourcei(alSources[id], AL_SAMPLE_OFFSET, &offset);
+			if (offset >= GetEffectiveLoopEnd())
+				alSourcei(alSources[id], AL_SAMPLE_OFFSET, LoopPoints[0]);
+		}
+		return true;
+	}
 	if (LoopCount < 2) return false;
 
 	ALint state;
@@ -229,8 +251,8 @@ bool CChannel::Update()
 		LoopCount--;
 		if (LoopCount == 1) {
 			// Playing last tune...
-			channelsThatNeedService--;
 			alSourcei(alSources[id], AL_LOOPING, AL_FALSE);
+			UpdateServiceState();
 		}
 	}
 	LastProcessedOffset = offset;
@@ -241,6 +263,33 @@ void CChannel::SetLoopPoints(ALint start, ALint end)
 {
 	LoopPoints[0] = start;
 	LoopPoints[1] = end;
+	UpdateServiceState();
+}
+
+ALint CChannel::GetEffectiveLoopEnd() const
+{
+	if (LoopPoints[1] >= 0)
+		return LoopPoints[1];
+	return DataSize / (DIGITALBITS / 8);
+}
+
+bool CChannel::HasValidCustomLoopPoints() const
+{
+	ALint start = LoopPoints[0];
+	ALint end = GetEffectiveLoopEnd();
+	return (start > 0 || LoopPoints[1] >= 0) && start >= 0 && end > start;
+}
+
+void CChannel::UpdateServiceState()
+{
+	bool needsService = LoopCount > 1 || (LoopCount == 0 && !bHasSoftLoopPoints);
+	if (needsService == bServiceActive)
+		return;
+	if (needsService)
+		channelsThatNeedService++;
+	else
+		channelsThatNeedService--;
+	bServiceActive = needsService;
 }
 	
 void CChannel::SetPosition(float x, float y, float z)

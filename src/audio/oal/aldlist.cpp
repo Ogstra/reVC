@@ -30,55 +30,57 @@
  */
 ALDeviceList::ALDeviceList()
 {
-	char *devices;
+	const char *devices = NULL;
 	int index;
-	const char *defaultDeviceName;
+	const char *defaultDeviceName = NULL;
 	const char *actualDeviceName;
+	ALenum deviceSpecifier = ALC_DEVICE_SPECIFIER;
+	ALenum defaultDeviceSpecifier = ALC_DEFAULT_DEVICE_SPECIFIER;
 
-	// DeviceInfo vector stores, for each enumerated device, it's device name, selection status, spec version #, and extension support
+	// DeviceInfo vector stores, for each enumerated device, its device name,
+	// selection status, spec version #, and extension support
 	nNumOfDevices = 0;
-
 	defaultDeviceIndex = 0;
 
 	if (alcIsExtensionPresent(NULL, "ALC_ENUMERATION_EXT")) {
-		devices = (char *)alcGetString(NULL, ALC_ALL_DEVICES_SPECIFIER);
-		defaultDeviceName = (char *)alcGetString(NULL, ALC_DEFAULT_ALL_DEVICES_SPECIFIER);
-		
+#ifdef ALC_ALL_DEVICES_SPECIFIER
+		if (alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT")) {
+			deviceSpecifier = ALC_ALL_DEVICES_SPECIFIER;
+			defaultDeviceSpecifier = ALC_DEFAULT_ALL_DEVICES_SPECIFIER;
+		}
+#endif
+		devices = (const char *)alcGetString(NULL, deviceSpecifier);
+		defaultDeviceName = (const char *)alcGetString(NULL, defaultDeviceSpecifier);
 		index = 0;
-		// go through device list (each device terminated with a single NULL, list terminated with double NULL)
-		while (*devices != '\0') {
-			if (strcmp(defaultDeviceName, devices) == 0) {
+
+		// Each device is terminated with '\0', and the list with '\0\0'.
+		while (devices && *devices != '\0') {
+			if (defaultDeviceName && strcmp(defaultDeviceName, devices) == 0)
 				defaultDeviceIndex = index;
-			}
+
 			ALCdevice *device = alcOpenDevice(devices);
 			if (device) {
 				ALCcontext *context = alcCreateContext(device, NULL);
 				if (context) {
 					alcMakeContextCurrent(context);
-					// if new actual device name isn't already in the list, then add it...
-					actualDeviceName = alcGetString(device, ALC_ALL_DEVICES_SPECIFIER);
-					if ((actualDeviceName != NULL) && (strlen(actualDeviceName) > 0)) {
+					actualDeviceName = alcGetString(device, deviceSpecifier);
+					if (actualDeviceName && strlen(actualDeviceName) > 0) {
 						ALDEVICEINFO &ALDeviceInfo = aDeviceInfo[nNumOfDevices++];
 						ALDeviceInfo.bSelected = true;
 						ALDeviceInfo.SetName(actualDeviceName);
 						alcGetIntegerv(device, ALC_MAJOR_VERSION, sizeof(int), &ALDeviceInfo.iMajorVersion);
 						alcGetIntegerv(device, ALC_MINOR_VERSION, sizeof(int), &ALDeviceInfo.iMinorVersion);
 
-						// Check for ALC Extensions
 						if (alcIsExtensionPresent(device, "ALC_EXT_CAPTURE") == AL_TRUE)
 							ALDeviceInfo.Extensions |= ADEXT_EXT_CAPTURE;
 						if (alcIsExtensionPresent(device, "ALC_EXT_EFX") == AL_TRUE)
 							ALDeviceInfo.Extensions |= ADEXT_EXT_EFX;
-
-						// Check for AL Extensions
 						if (alIsExtensionPresent("AL_EXT_OFFSET") == AL_TRUE)
 							ALDeviceInfo.Extensions |= ADEXT_EXT_OFFSET;
-
 						if (alIsExtensionPresent("AL_EXT_LINEAR_DISTANCE") == AL_TRUE)
 							ALDeviceInfo.Extensions |= ADEXT_EXT_LINEAR_DISTANCE;
 						if (alIsExtensionPresent("AL_EXT_EXPONENT_DISTANCE") == AL_TRUE)
 							ALDeviceInfo.Extensions |= ADEXT_EXT_EXPONENT_DISTANCE;
-						
 						if (alIsExtensionPresent("EAX2.0") == AL_TRUE)
 							ALDeviceInfo.Extensions |= ADEXT_EAX2;
 						if (alIsExtensionPresent("EAX3.0") == AL_TRUE)
@@ -87,11 +89,9 @@ ALDeviceList::ALDeviceList()
 							ALDeviceInfo.Extensions |= ADEXT_EAX4;
 						if (alIsExtensionPresent("EAX5.0") == AL_TRUE)
 							ALDeviceInfo.Extensions |= ADEXT_EAX5;
-
 						if (alIsExtensionPresent("EAX-RAM") == AL_TRUE)
 							ALDeviceInfo.Extensions |= ADEXT_EAX_RAM;
 
-						// Get Source Count
 						ALDeviceInfo.uiSourceCount = GetMaxNumSources();
 					}
 					alcMakeContextCurrent(NULL);
@@ -101,6 +101,34 @@ ALDeviceList::ALDeviceList()
 			}
 			devices += strlen(devices) + 1;
 			index += 1;
+		}
+	}
+
+	// Fallback: ensure at least one provider exists even if enumeration is unavailable.
+	if (nNumOfDevices == 0) {
+		ALCdevice *device = alcOpenDevice(NULL);
+		if (device) {
+			ALCcontext *context = alcCreateContext(device, NULL);
+			if (context) {
+				alcMakeContextCurrent(context);
+				actualDeviceName = alcGetString(device, ALC_DEVICE_SPECIFIER);
+
+				ALDEVICEINFO &ALDeviceInfo = aDeviceInfo[nNumOfDevices++];
+				ALDeviceInfo.bSelected = true;
+				if (actualDeviceName && strlen(actualDeviceName) > 0)
+					ALDeviceInfo.SetName(actualDeviceName);
+				else
+					ALDeviceInfo.SetName("Default OpenAL Device");
+				alcGetIntegerv(device, ALC_MAJOR_VERSION, sizeof(int), &ALDeviceInfo.iMajorVersion);
+				alcGetIntegerv(device, ALC_MINOR_VERSION, sizeof(int), &ALDeviceInfo.iMinorVersion);
+				if (alcIsExtensionPresent(device, "ALC_EXT_EFX") == AL_TRUE)
+					ALDeviceInfo.Extensions |= ADEXT_EXT_EFX;
+				ALDeviceInfo.uiSourceCount = GetMaxNumSources();
+
+				alcMakeContextCurrent(NULL);
+				alcDestroyContext(context);
+			}
+			alcCloseDevice(device);
 		}
 	}
 

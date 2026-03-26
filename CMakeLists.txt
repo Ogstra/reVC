@@ -3,6 +3,19 @@ cmake_minimum_required(VERSION 3.14)
 set(EXECUTABLE reVC)
 set(PROJECT REVC)
 
+# Build Apple Silicon by default when configuring on Apple Silicon hosts.
+# This can still be overridden with -DCMAKE_OSX_ARCHITECTURES=...
+if(APPLE AND NOT CMAKE_OSX_ARCHITECTURES)
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+        set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "macOS target architectures" FORCE)
+    endif()
+endif()
+
+# arm64 on macOS requires at least macOS 11.0.
+if(APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES "arm64" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "macOS deployment target" FORCE)
+endif()
+
 project(${EXECUTABLE} C CXX)
 set(${PROJECT}_AUTHOR "${PROJECT} Team")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
