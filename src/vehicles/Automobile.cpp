@@ -262,6 +262,13 @@ CAutomobile::ProcessControl(void)
 	float wheelRot;
 	CColModel *colModel;
 	float brake = 0.0f;
+#ifdef FIX_BUGS
+	const float wheelAirStep = Min(CTimer::GetTimeStepFix(), 1.0f);
+	const float wheelAirDamping = Pow(0.95f, wheelAirStep);
+#else
+	const float wheelAirStep = 1.0f;
+	const float wheelAirDamping = 0.95f;
+#endif
 
 	if(bUsingSpecialColModel)
 		colModel = &CWorld::Players[CWorld::PlayerInFocus].m_ColModel;
@@ -1019,35 +1026,35 @@ CAutomobile::ProcessControl(void)
 		// Process front wheels off ground
 
 		if(!IsRealHeli()){
-			if(m_aWheelTimer[CARWHEEL_FRONT_LEFT] <= 0.0f){
-				if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
-					if(acceleration > 0.0f){
-						if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] -= 0.2f;
+				if(m_aWheelTimer[CARWHEEL_FRONT_LEFT] <= 0.0f){
+					if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
+						if(acceleration > 0.0f){
+							if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] < 2.0f)
+								m_aWheelSpeed[CARWHEEL_FRONT_LEFT] -= 0.2f*wheelAirStep;
+						}else{
+							if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] > -2.0f)
+								m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f*wheelAirStep;
+						}
 					}else{
-						if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f;
+						m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= wheelAirDamping;
 					}
-				}else{
-					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= 0.95f;
+					m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT];
 				}
-				m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT];
-			}
-			if(m_aWheelTimer[CARWHEEL_FRONT_RIGHT] <= 0.0f){
-				if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
-					if(acceleration > 0.0f){
-						if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] -= 0.2f;
+				if(m_aWheelTimer[CARWHEEL_FRONT_RIGHT] <= 0.0f){
+					if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
+						if(acceleration > 0.0f){
+							if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] < 2.0f)
+								m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] -= 0.2f*wheelAirStep;
+						}else{
+							if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] > -2.0f)
+								m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f*wheelAirStep;
+						}
 					}else{
-						if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f;
+						m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= wheelAirDamping;
 					}
-				}else{
-					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= 0.95f;
+					m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT];
 				}
-				m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT];
 			}
-		}
 		}
 
 		// Process rear wheels
@@ -1070,14 +1077,18 @@ CAutomobile::ProcessControl(void)
 					if(m_fTireTemperature > 2.0f)
 						m_fTireTemperature = 2.0f;
 				}
-			}else if(m_doingBurnout && mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier)){
-				rearBrake = 0.0f;
-				rearTraction = 0.0f;
-				// BUG: missing timestep
-				ApplyTurnForce(contactPoints[CARWHEEL_REAR_LEFT], -0.001f*m_fTurnMass*m_fSteerAngle*GetRight());
-			}else if(m_fTireTemperature > 1.0f){
-				rearTraction *= m_fTireTemperature;
-			}
+				}else if(m_doingBurnout && mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier)){
+					rearBrake = 0.0f;
+					rearTraction = 0.0f;
+					// BUG: missing timestep
+#ifdef FIX_BUGS
+					ApplyTurnForce(contactPoints[CARWHEEL_REAR_LEFT], -0.001f*m_fTurnMass*m_fSteerAngle*GetRight()*wheelAirStep);
+#else
+					ApplyTurnForce(contactPoints[CARWHEEL_REAR_LEFT], -0.001f*m_fTurnMass*m_fSteerAngle*GetRight());
+#endif
+				}else if(m_fTireTemperature > 1.0f){
+					rearTraction *= m_fTireTemperature;
+				}
 
 			if(m_aWheelTimer[CARWHEEL_REAR_LEFT] > 0.0f){
 				if(mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier))
@@ -1176,38 +1187,38 @@ CAutomobile::ProcessControl(void)
 		// Process rear wheels off ground
 
 		if(!IsRealHeli()){
-			if(m_aWheelTimer[CARWHEEL_REAR_LEFT] <= 0.0f){
-				if(bIsHandbrakeOn)
-					m_aWheelSpeed[CARWHEEL_REAR_LEFT] = 0.0f;
-				else if(mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
-					if(acceleration > 0.0f){
-						if(m_aWheelSpeed[CARWHEEL_REAR_LEFT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_REAR_LEFT] -= 0.2f;
+				if(m_aWheelTimer[CARWHEEL_REAR_LEFT] <= 0.0f){
+					if(bIsHandbrakeOn)
+						m_aWheelSpeed[CARWHEEL_REAR_LEFT] = 0.0f;
+					else if(mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
+						if(acceleration > 0.0f){
+							if(m_aWheelSpeed[CARWHEEL_REAR_LEFT] < 2.0f)
+								m_aWheelSpeed[CARWHEEL_REAR_LEFT] -= 0.2f*wheelAirStep;
+						}else{
+							if(m_aWheelSpeed[CARWHEEL_REAR_LEFT] > -2.0f)
+								m_aWheelSpeed[CARWHEEL_REAR_LEFT] += 0.1f*wheelAirStep;
+						}
 					}else{
-						if(m_aWheelSpeed[CARWHEEL_REAR_LEFT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_REAR_LEFT] += 0.1f;
+						m_aWheelSpeed[CARWHEEL_REAR_LEFT] *= wheelAirDamping;
 					}
-				}else{
-					m_aWheelSpeed[CARWHEEL_REAR_LEFT] *= 0.95f;
+					m_aWheelRotation[CARWHEEL_REAR_LEFT] += m_aWheelSpeed[CARWHEEL_REAR_LEFT];
 				}
-				m_aWheelRotation[CARWHEEL_REAR_LEFT] += m_aWheelSpeed[CARWHEEL_REAR_LEFT];
-			}
-			if(m_aWheelTimer[CARWHEEL_REAR_RIGHT] <= 0.0f){
-				if(bIsHandbrakeOn)
-					m_aWheelSpeed[CARWHEEL_REAR_RIGHT] = 0.0f;
-				else if(mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
-					if(acceleration > 0.0f){
-						if(m_aWheelSpeed[CARWHEEL_REAR_RIGHT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_REAR_RIGHT] -= 0.2f;
+				if(m_aWheelTimer[CARWHEEL_REAR_RIGHT] <= 0.0f){
+					if(bIsHandbrakeOn)
+						m_aWheelSpeed[CARWHEEL_REAR_RIGHT] = 0.0f;
+					else if(mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
+						if(acceleration > 0.0f){
+							if(m_aWheelSpeed[CARWHEEL_REAR_RIGHT] < 2.0f)
+								m_aWheelSpeed[CARWHEEL_REAR_RIGHT] -= 0.2f*wheelAirStep;
+						}else{
+							if(m_aWheelSpeed[CARWHEEL_REAR_RIGHT] > -2.0f)
+								m_aWheelSpeed[CARWHEEL_REAR_RIGHT] += 0.1f*wheelAirStep;
+						}
 					}else{
-						if(m_aWheelSpeed[CARWHEEL_REAR_RIGHT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_REAR_RIGHT] += 0.1f;
+						m_aWheelSpeed[CARWHEEL_REAR_RIGHT] *= wheelAirDamping;
 					}
-				}else{
-					m_aWheelSpeed[CARWHEEL_REAR_RIGHT] *= 0.95f;
+					m_aWheelRotation[CARWHEEL_REAR_RIGHT] += m_aWheelSpeed[CARWHEEL_REAR_RIGHT];
 				}
-				m_aWheelRotation[CARWHEEL_REAR_RIGHT] += m_aWheelSpeed[CARWHEEL_REAR_RIGHT];
-			}
 		}
 
 		// Process front wheels on ground - second try
@@ -1308,36 +1319,36 @@ CAutomobile::ProcessControl(void)
 
 		// Process front wheels off ground
 
-		if (!IsRealHeli()) {
-			if(m_aWheelTimer[CARWHEEL_FRONT_LEFT] <= 0.0f){
-				if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
-					if(acceleration > 0.0f){
-						if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] -= 0.2f;
+			if (!IsRealHeli()) {
+				if(m_aWheelTimer[CARWHEEL_FRONT_LEFT] <= 0.0f){
+					if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
+						if(acceleration > 0.0f){
+							if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] < 2.0f)
+								m_aWheelSpeed[CARWHEEL_FRONT_LEFT] -= 0.2f*wheelAirStep;
+						}else{
+							if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] > -2.0f)
+								m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f*wheelAirStep;
+						}
 					}else{
-						if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f;
+						m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= wheelAirDamping;
 					}
-				}else{
-					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= 0.95f;
+					m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT];
 				}
-				m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT];
-			}
-			if(m_aWheelTimer[CARWHEEL_FRONT_RIGHT] <= 0.0f){
-				if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
-					if(acceleration > 0.0f){
-						if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] -= 0.2f;
+				if(m_aWheelTimer[CARWHEEL_FRONT_RIGHT] <= 0.0f){
+					if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
+						if(acceleration > 0.0f){
+							if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] < 2.0f)
+								m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] -= 0.2f*wheelAirStep;
+						}else{
+							if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] > -2.0f)
+								m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f*wheelAirStep;
+						}
 					}else{
-						if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f;
+						m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= wheelAirDamping;
 					}
-				}else{
-					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= 0.95f;
+					m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT];
 				}
-				m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT];
 			}
-		}
 		}
 
 		for(i = 0; i < 4; i++){
@@ -1394,14 +1405,14 @@ CAutomobile::ProcessControl(void)
 #ifdef FIX_BUGS
 		isPlane = isPlane && !IsRealHeli();
 #endif
-		if(GetStatus() != STATUS_PLAYER && GetStatus() != STATUS_PLAYER_REMOTE && GetStatus() != STATUS_PHYSICS){
-			if(IsRealHeli()){
-				bEngineOn = false;
-				m_aWheelSpeed[1] = Max(m_aWheelSpeed[1]-0.0005f, 0.0f);
-				if(GetModelIndex() != MI_RCRAIDER && GetModelIndex() != MI_RCGOBLIN)
-					if(m_aWheelSpeed[1] < 0.154f && m_aWheelSpeed[1] > 0.0044f)
-						playRotorSound = true;
-			}
+			if(GetStatus() != STATUS_PLAYER && GetStatus() != STATUS_PLAYER_REMOTE && GetStatus() != STATUS_PHYSICS){
+				if(IsRealHeli()){
+					bEngineOn = false;
+					m_aWheelSpeed[1] = Max(m_aWheelSpeed[1]-0.0005f*wheelAirStep, 0.0f);
+					if(GetModelIndex() != MI_RCRAIDER && GetModelIndex() != MI_RCGOBLIN)
+						if(m_aWheelSpeed[1] < 0.154f && m_aWheelSpeed[1] > 0.0044f)
+							playRotorSound = true;
+				}
 		}else if(isPlane && m_vecMoveSpeed.Magnitude() > 0.0f && CTimer::GetTimeStep() > 0.0f){
 			if(GetModelIndex() == MI_DODO)
 				FlyingControl(FLIGHT_MODEL_DODO);
@@ -1415,14 +1426,14 @@ CAutomobile::ProcessControl(void)
 				FlyingControl(FLIGHT_MODEL_HELI);
 			else
 #endif
-			{
-				// Speed up rotor
-				if (m_aWheelSpeed[1] < 0.22f && !bIsInWater) {
-					if (GetModelIndex() == MI_RCRAIDER || GetModelIndex() == MI_RCGOBLIN)
-						m_aWheelSpeed[1] += 0.003f;
-					else
-						m_aWheelSpeed[1] += 0.001f;
-				}
+				{
+					// Speed up rotor
+					if (m_aWheelSpeed[1] < 0.22f && !bIsInWater) {
+						if (GetModelIndex() == MI_RCRAIDER || GetModelIndex() == MI_RCGOBLIN)
+							m_aWheelSpeed[1] += 0.003f*wheelAirStep;
+						else
+							m_aWheelSpeed[1] += 0.001f*wheelAirStep;
+					}
 
 				// Fly
 				if (m_aWheelSpeed[1] > 0.15f) {
