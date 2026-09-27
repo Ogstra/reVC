@@ -1111,6 +1111,7 @@ CBike::ProcessControl(void)
 	}
 
 	if(m_fHealth < 250.0f && GetStatus() != STATUS_WRECKED){
+		CONTINUOUS_PARTICLE_EMITTER;
 		// Car is on fire
 
 		CVector damagePos, fireDir;
@@ -1294,6 +1295,7 @@ CBike::Teleport(CVector pos)
 void
 CBike::PreRender(void)
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	int i;
 	CVehicleModelInfo *mi = (CVehicleModelInfo*)CModelInfo::GetModelInfo(GetModelIndex());
 

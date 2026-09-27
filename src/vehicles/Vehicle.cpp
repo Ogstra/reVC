@@ -664,6 +664,7 @@ CVehicle::DoBladeCollision(CVector pos, CMatrix &matrix, int16 rotorType, float 
 bool
 CVehicle::BladeColSectorList(CPtrList &list, CColModel &rotorColModel, CMatrix &matrix, int16 rotorType, float damageMult)
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	int i;
 	CVector axis;
 	CVector turnSpeed(0.0f, 0.0f, 0.0f);
@@ -2115,6 +2116,7 @@ CVehicle::UpdateClumpAlpha(void)
 void
 CVehicle::HeliDustGenerate(CEntity *heli, float radius, float ground, int rnd)
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	int i;
 	float angle;
 	CColPoint point;

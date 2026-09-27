@@ -248,6 +248,7 @@ CObject::Render(void)
 	RwRGBA color = { (uint8)red, (uint8)green, (uint8)blue, (uint8)alpha };
 
 	if (this->GetModelIndex() == MI_YT_MAIN_BODY) {
+		CONTINUOUS_PARTICLE_EMITTER;
 		float moveSpeedMagnitude = this->GetMoveSpeed().Magnitude();
 		if (moveSpeedMagnitude > 0.0f) {
 			float scaleMax = GetColModel()->boundingBox.max.y * 0.85f;

@@ -270,6 +270,7 @@ CBoat::ProcessControl(void)
 	if(m_fHealth <= 460.0f && GetStatus() != STATUS_WRECKED &&
 	   Abs(GetPosition().x - TheCamera.GetPosition().x) < 200.0f &&
 	   Abs(GetPosition().y - TheCamera.GetPosition().y) < 200.0f){
+		CONTINUOUS_PARTICLE_EMITTER;
 		float speedSq = m_vecMoveSpeed.MagnitudeSqr();
 		CVector smokeDir = 0.8f*m_vecMoveSpeed;
 		CVector smokePos;
@@ -441,6 +442,7 @@ CBoat::ProcessControl(void)
 					}
 
 					// Spray some particles
+					CONTINUOUS_PARTICLE_EMITTER;
 					CVector jetDir = -0.04f * force;
 					if(m_fGasPedal > 0.0f){
 						if(GetStatus() == STATUS_PLAYER){
@@ -573,6 +575,7 @@ CBoat::ProcessControl(void)
 		float speed = m_vecMoveSpeed.Magnitude();
 		if(speed > 0.05f && GetUp().x > 0.0f && !TheCamera.GetLookingForwardFirstPerson() && IsVisible() &&
 		   (AutoPilot.m_nCarMission != MISSION_CRUISE || (CTimer::GetFrameCounter()&2) == 0)){
+			CONTINUOUS_PARTICLE_EMITTER;
 			CVector splashPos, splashDir;
 			float splashSize, front, waterLevel;
 
@@ -709,6 +712,7 @@ CBoat::ProcessControl(void)
 		// Spray waterdrops on screen
 		if(TheCamera.GetLookingForwardFirstPerson() && FindPlayerVehicle() && FindPlayerVehicle()->IsBoat() &&
 		   m_nDeltaVolumeUnderWater > 0 && numWaterDropOnScreen < 20){
+			CONTINUOUS_PARTICLE_EMITTER;
 			CVector dropPos;
 			CVector dropDir(CGeneral::GetRandomNumberInRange(-0.25f, 0.25f), CGeneral::GetRandomNumberInRange(1.0f, 0.75f), 0.0f);
 

@@ -1597,6 +1597,7 @@ CAutomobile::ProcessControl(void)
 
 	if(m_fHealth < 250.0f && GetStatus() != STATUS_WRECKED){
 		// Car is on fire
+		CONTINUOUS_PARTICLE_EMITTER;
 
 		CParticle::AddParticle(PARTICLE_CARFLAME, damagePos,
 			CVector(0.0f, 0.0f, CGeneral::GetRandomNumberInRange(0.01125f, 0.09f)),
@@ -1746,6 +1747,7 @@ CAutomobile::ProcessControl(void)
 	}
 
 	if(IsRealHeli() && bHeliDestroyed && !bRenderScorched){
+		CONTINUOUS_PARTICLE_EMITTER;
 		ApplyMoveForce(0.0f, 0.0f, -2.0f*CTimer::GetTimeStep());
 		m_vecTurnSpeed.z += -0.002f*CTimer::GetTimeStep();
 		m_vecTurnSpeed.x += -0.0002f*CTimer::GetTimeStep();
@@ -1783,6 +1785,7 @@ CAutomobile::Teleport(CVector pos)
 void
 CAutomobile::PreRender(void)
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	int i, j, n;
 	CVehicleModelInfo *mi = (CVehicleModelInfo*)CModelInfo::GetModelInfo(GetModelIndex());
 
