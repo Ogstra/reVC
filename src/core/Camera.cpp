@@ -197,8 +197,9 @@ CCamera::Init(void)
 		m_bMusicFading = false;
 		m_fTimeToFadeMusic = 0.0f;
 		m_fFLOATingFadeMusic = 0.0f;
-		m_fMouseAccelVertical = 0.003f;
-		m_fMouseAccelHorzntl = 0.0025f;
+		// half the original mouse sensitivity by default (was 0.003 / 0.0025)
+		m_fMouseAccelVertical = 0.00175f;
+		m_fMouseAccelHorzntl = 0.00125f;
 	}
 	if(FrontEndMenuManager.m_bWantToRestart)
 		m_fTimeToFadeMusic = 0.0f;

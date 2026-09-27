@@ -37,7 +37,7 @@ extern float fRangePlayerRadius;
 extern float fCloseNearClipLimit;
 
 #ifdef FREE_CAM
-bool CCamera::bFreeCam = false;
+bool CCamera::bFreeCam = true;	// free camera on by default
 int nPreviousMode = -1;
 #endif
 
@@ -4870,7 +4870,17 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 	float colMaxZ = carCol->boundingBox.max.z;  // As opposed to LCS and SA, VC does this: carCol->boundingBox.max.z - carCol->boundingBox.min.z;
 	float approxCarLength = 2.0f * Abs(carCol->boundingBox.min.y); // SA taxi min.y = -2.95, max.z = 0.883502f
 
+#ifdef FIX_BUGS
+	// Use the same distance as the fixed camera (Cam_On_A_String_Unobscured), so switching between
+	// the two doesn't move the camera closer or further away
+	CVector carDimensions = carCol->boundingBox.max - carCol->boundingBox.min;
+	float baseDist = carDimensions.Magnitude();
+	if (isBike)
+		baseDist *= 1.45f;
+	float newDistance = baseDist + 0.1f + TheCamera.CarZoomValueSmooth;
+#else
 	float newDistance = TheCamera.CarZoomValueSmooth + CARCAM_SET[camSetArrPos][1] + approxCarLength;
+#endif
 
 	// Taken from VC CCam::Cam_On_A_String_Unobscured. If we don't this, we will end up seeing the world from the inside of RC Goblin/Raider.
 	// I couldn't find where SA does that. It's possible that they've increased the size of these veh.'s collision bounding box.
@@ -4886,7 +4896,9 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 		float radiusToStayOutside = colMaxZ * CARCAM_SET[camSetArrPos][0] - CARCAM_SET[camSetArrPos][2];
 		if (radiusToStayOutside > 0.0f) {
 			TargetCoors.z += radiusToStayOutside;
+#ifndef FIX_BUGS
 			newDistance += radiusToStayOutside;
+#endif
 			zoomModeAlphaOffset += 0.3f / newDistance * radiusToStayOutside;
 		}
 	} else {
