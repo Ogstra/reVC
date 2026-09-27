@@ -323,6 +323,7 @@ void CWeather::Update(void)
 
 void CWeather::AddHeatHaze()
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	if(TheCamera.Cams[TheCamera.ActiveCam].Mode == CCam::MODE_TOPDOWN ||
 	   TheCamera.Cams[TheCamera.ActiveCam].Mode == CCam::MODE_TOP_DOWN_PED)
 		return;
@@ -338,6 +339,7 @@ void CWeather::AddHeatHaze()
 
 void CWeather::AddBeastie()
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	if(FindPlayerVehicle() || CTimer::GetFrameCounter()%10 || (CGeneral::GetRandomNumber()&5) == 0)
 		return;
 	CVector pos = TheCamera.GetPosition();
@@ -370,6 +372,7 @@ void CWeather::ReleaseWeather()
 
 void CWeather::AddSplashesDuringHurricane()
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	RwRGBA colour = { 255, 255, 255, 32 };
 	CVector pos = TheCamera.pTargetEntity ? TheCamera.pTargetEntity->GetPosition() : TheCamera.GetPosition();
 	bool foundGround;
@@ -397,6 +400,7 @@ static int startStreamAfterRain;
 
 void CWeather::AddStreamAfterRain()
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	if(CClock::GetHours() > 6 && CClock::GetHours() < 18){
 		RwRGBA colour = { 255, 255, 255, 24 };
 		CVector pos = TheCamera.pTargetEntity ? TheCamera.pTargetEntity->GetPosition() : TheCamera.GetPosition();
@@ -426,6 +430,7 @@ void CWeather::AddStreamAfterRain()
 
 void CWeather::AddRain()
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	if (CCullZones::CamNoRain() || CCullZones::PlayerNoRain())
 		return;
 	if (TheCamera.GetLookingLRBFirstPerson()) {

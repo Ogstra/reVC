@@ -402,16 +402,16 @@ CVehicle::FlyingControl(eFlightModel flightModel)
 			fRollAccel = fSteerLR * pFlyingHandling->fRoll;
 		ApplyTurnForce(GetRight() * fRollAccel * fForwSpeed * m_fTurnMass * CTimer::GetTimeStep(), GetUp());
 
-			CVector vecFRight = CrossProduct(GetForward(), CVector(0.0f, 0.0f, 1.0f));
-			CVector vecStabilise = (GetUp().z > 0.0f) ? vecFRight : -vecFRight;
-			float fStabiliseDirection = (GetRight().z > 0.0f) ? -1.0f : 1.0f;
-			float fStabiliseSpeed = pFlyingHandling->fRollStab * fStabiliseDirection * (1.0f - DotProduct(GetRight(), vecStabilise)) * (1.0f - Abs(GetForward().z));
-			float fStabiliseImpulse = fStabiliseSpeed * m_fTurnMass;
-#ifdef FIX_BUGS
-			// Keep roll-stabilization strength consistent above 30 FPS.
-			fStabiliseImpulse *= Min(CTimer::GetTimeStepFix(), 1.0f);
+		CVector vecFRight = CrossProduct(GetForward(), CVector(0.0f, 0.0f, 1.0f));
+		CVector vecStabilise = (GetUp().z > 0.0f) ? vecFRight : -vecFRight;
+		float fStabiliseDirection = (GetRight().z > 0.0f) ? -1.0f : 1.0f;
+		float fStabiliseSpeed = pFlyingHandling->fRollStab * fStabiliseDirection * (1.0f - DotProduct(GetRight(), vecStabilise)) * (1.0f - Abs(GetForward().z));
+#ifdef FIX_HIGH_FPS_BUGS
+		// applied every frame, so it's a force: scale it to keep the 30 fps strength
+		ApplyTurnForce(fStabiliseSpeed * m_fTurnMass * CTimer::GetTimeStepFix() * GetRight(), GetUp());
+#else
+		ApplyTurnForce(fStabiliseSpeed * m_fTurnMass * GetRight(), GetUp()); // no CTimer::GetTimeStep(), is it right?
 #endif
-			ApplyTurnForce(fStabiliseImpulse * GetRight(), GetUp()); // no CTimer::GetTimeStep(), is it right?
 
 		// up/down
 		float fTail = -DotProduct(GetSpeed(vecTail), GetUp());
@@ -440,7 +440,12 @@ CVehicle::FlyingControl(eFlightModel flightModel)
 		float rZ = Pow(vecResistance.z, CTimer::GetTimeStep());
 		CVector vecTurnSpeed = Multiply3x3(m_vecTurnSpeed, GetMatrix());
 		vecTurnSpeed.x *= rX;
+#ifdef FIX_HIGH_FPS_BUGS
+		// the speed dependent part was applied once per frame without the time step
+		float fResistance = vecTurnSpeed.y * CTimer::ScaleFrameMultiplier(1.0f / (pFlyingHandling->vecSpeedRes.y * SQR(vecTurnSpeed.y) + 1.0f)) * rY - vecTurnSpeed.y;
+#else
 		float fResistance = vecTurnSpeed.y * (1.0f / (pFlyingHandling->vecSpeedRes.y * SQR(vecTurnSpeed.y) + 1.0f)) * rY - vecTurnSpeed.y;
+#endif
 		vecTurnSpeed.z *= rZ;
 		m_vecTurnSpeed = Multiply3x3(GetMatrix(), vecTurnSpeed);
 		ApplyTurnForce(-GetUp() * fResistance * m_fTurnMass, GetRight() + Multiply3x3(GetMatrix(), m_vecCentreOfMass));
@@ -545,7 +550,15 @@ CVehicle::FlyingControl(eFlightModel flightModel)
 		float rY = Pow(flyingHandling->vecTurnRes.y, CTimer::GetTimeStep());
 		float rZ = Pow(flyingHandling->vecTurnRes.z, CTimer::GetTimeStep());
 		CVector vecTurnSpeed = Multiply3x3(m_vecTurnSpeed, GetMatrix());
+#ifdef FIX_HIGH_FPS_BUGS
+		// rZ already has the time step in its exponent, raising it to the time step again made the
+		// exponent quadratic in the time step, so yaw damping per second fell off sharply above 30 fps.
+		// Make the exponent linear in the time step, with the value it has at 30 fps.
+		float fResistanceMultiplier = Pow(1.0f / (flyingHandling->vecSpeedRes.z * SQR(vecTurnSpeed.z) + 1.0f) *
+			Pow(flyingHandling->vecTurnRes.z, CTimer::GetDefaultTimeStep()), CTimer::GetTimeStep());
+#else
 		float fResistanceMultiplier = Pow(1.0f / (flyingHandling->vecSpeedRes.z * SQR(vecTurnSpeed.z) + 1.0f) * rZ, CTimer::GetTimeStep());
+#endif
 		float fResistance = vecTurnSpeed.z * fResistanceMultiplier - vecTurnSpeed.z;
 		vecTurnSpeed.x *= rX;
 		vecTurnSpeed.y *= rY;
@@ -651,6 +664,7 @@ CVehicle::DoBladeCollision(CVector pos, CMatrix &matrix, int16 rotorType, float 
 bool
 CVehicle::BladeColSectorList(CPtrList &list, CColModel &rotorColModel, CMatrix &matrix, int16 rotorType, float damageMult)
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	int i;
 	CVector axis;
 	CVector turnSpeed(0.0f, 0.0f, 0.0f);
@@ -817,8 +831,12 @@ CVehicle::ProcessWheel(CVector &wheelFwd, CVector &wheelRight, CVector &wheelCon
 	if(contactSpeedRight != 0.0f){
 		// exert opposing force
 		right = -contactSpeedRight/wheelsOnGround;
-		// Keep vehicle grip/slide behavior consistent above 30 FPS without affecting low-FPS behavior.
-		right *= Min(CTimer::GetTimeStepFix(), 1.0f);
+		// BUG?
+		// contactSpeedRight is independent of framerate but right has timestep as a factor
+		// so we probably have to fix this
+		// fixing this causes jittery cars at 15fps, and causes the car to move backwards slowly at 18fps
+		// at 19fps, the effects are gone ...
+		//right *= CTimer::GetTimeStepFix();
 
 		if(wheelStatus == WHEEL_STATUS_BURST){
 			float fwdspeed = Min(contactSpeedFwd, fBurstSpeedMax);
@@ -840,8 +858,10 @@ CVehicle::ProcessWheel(CVector &wheelFwd, CVector &wheelRight, CVector &wheelCon
 	}else if(contactSpeedFwd != 0.0f){
 		fwd = -contactSpeedFwd/wheelsOnGround;
 #ifdef FIX_BUGS
-		// Same rationale as right-axis compensation above.
-		fwd *= Min(CTimer::GetTimeStepFix(), 1.0f);
+		// contactSpeedFwd is independent of framerate but fwd has timestep as a factor
+		// so we probably have to fix this
+		// better get rid of it here too
+		//fwd *= CTimer::GetTimeStepFix();
 #endif
 
 		if(!bBraking){
@@ -975,8 +995,10 @@ CVehicle::ProcessBikeWheel(CVector &wheelFwd, CVector &wheelRight, CVector &whee
 		// exert opposing force
 		right = -contactSpeedRight/wheelsOnGround;
 #ifdef FIX_BUGS
-		// Keep bike grip/slide behavior consistent above 30 FPS without affecting low-FPS behavior.
-		right *= Min(CTimer::GetTimeStepFix(), 1.0f);
+		// contactSpeedRight is independent of framerate but right has timestep as a factor
+		// so we probably have to fix this
+		// see above
+		//right *= CTimer::GetTimeStepFix();
 #endif
 
 		if(wheelStatus == WHEEL_STATUS_BURST){
@@ -999,8 +1021,10 @@ CVehicle::ProcessBikeWheel(CVector &wheelFwd, CVector &wheelRight, CVector &whee
 	}else if(contactSpeedFwd != 0.0f){
 		fwd = -contactSpeedFwd/wheelsOnGround;
 #ifdef FIX_BUGS
-		// Same rationale as right-axis compensation above.
-		fwd *= Min(CTimer::GetTimeStepFix(), 1.0f);
+		// contactSpeedFwd is independent of framerate but fwd has timestep as a factor
+		// so we probably have to fix this
+		// see above
+		//fwd *= CTimer::GetTimeStepFix();
 #endif
 
 		if(!bBraking){
@@ -2092,6 +2116,7 @@ CVehicle::UpdateClumpAlpha(void)
 void
 CVehicle::HeliDustGenerate(CEntity *heli, float radius, float ground, int rnd)
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	int i;
 	float angle;
 	CColPoint point;

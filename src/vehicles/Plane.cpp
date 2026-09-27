@@ -152,9 +152,17 @@ CPlane::ProcessControl(void)
 
 	// Explosion
 	if(m_bHasBeenHit){
+#ifdef FIX_HIGH_FPS_BUGS
+	// step through every 30 fps frame of game time, so none of the explosion stages is skipped or repeated
+	for(uint32 simFramesLeft = CTimer::GetSimFramesPassed(); simFramesLeft > 0; simFramesLeft--){
+		uint32 frameCounter = CTimer::GetSimFrameCounter() - (simFramesLeft - 1);
+#else
+	{
+		uint32 frameCounter = CTimer::GetFrameCounter();
+#endif
 		// BUG: since this is all based on frames, you can skip the explosion processing when you go into the menu
 		if(GetModelIndex() == MI_AIRTRAIN){
-			int frm = CTimer::GetFrameCounter() - m_nFrameWhenHit;
+			int frm = frameCounter - m_nFrameWhenHit;
 			if(frm == 20){
 				static int nFrameGen;
 				CRGBA colors[8];
@@ -208,7 +216,7 @@ CPlane::ProcessControl(void)
 				FlagToDestroyWhenNextProcessed();
 			}
 		}else{
-			int frm = CTimer::GetFrameCounter() - m_nFrameWhenHit;
+			int frm = frameCounter - m_nFrameWhenHit;
 			if(frm == 20){
 				static int nFrameGen;
 				CRGBA colors[8];
@@ -270,6 +278,7 @@ CPlane::ProcessControl(void)
 				FlagToDestroyWhenNextProcessed();
 			}
 		}
+	}
 	}
 
 	// Update plane position and speed
@@ -992,7 +1001,11 @@ CPlane::TestRocketCollision(CVector *rocketPos)
 		   plane->GetModelIndex() != MI_AIRTRAIN && plane->GetModelIndex() == MI_DEADDODO &&	// strange check
 #endif
 		   !plane->m_bHasBeenHit && (*rocketPos - plane->GetPosition()).Magnitude() < 25.0f){
+#ifdef FIX_HIGH_FPS_BUGS
+			plane->m_nFrameWhenHit = CTimer::GetSimFrameCounter();
+#else
 			plane->m_nFrameWhenHit = CTimer::GetFrameCounter();
+#endif
 			plane->m_bHasBeenHit = true;
 			CWorld::Players[CWorld::PlayerInFocus].m_pPed->m_pWanted->RegisterCrime_Immediately(CRIME_DESTROYED_CESSNA,
 				plane->GetPosition(), i+1983, false);

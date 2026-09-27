@@ -1540,6 +1540,19 @@ psSelectDevice()
 			}
 		}
 
+#ifdef FIX_BUGS
+		// nothing fits the saved resolution (e.g. an ini from another monitor), use the largest fullscreen mode instead
+		if(bestFsMode < 0){
+			for (GcurSelVM = 0; GcurSelVM < RwEngineGetNumVideoModes(); GcurSelVM++) {
+				RwEngineGetVideoModeInfo(&vm, GcurSelVM);
+				if ((vm.flags & rwVIDEOMODEEXCLUSIVE) && vm.width >= bestWidth && vm.height >= bestHeight){
+					bestWidth = vm.width;
+					bestHeight = vm.height;
+					bestFsMode = GcurSelVM;
+				}
+			}
+		}
+#endif
 		if(bestFsMode < 0){
 			MessageBox(nil, "Cannot find desired video mode", "GTA: Vice City", MB_OK);
 			return FALSE;
@@ -1638,6 +1651,12 @@ psSelectDevice()
 #endif
 	}
 #ifdef MULTISAMPLING
+#ifdef FIX_BUGS
+	// creating the device fails with a level it can't do (e.g. from an ini made on another PC)
+	while(FrontEndMenuManager.m_nPrefsMSAALevel > 0 &&
+	      (RwUInt32)(1 << FrontEndMenuManager.m_nPrefsMSAALevel) > RwD3D8EngineGetMaxMultiSamplingLevels())
+		FrontEndMenuManager.m_nPrefsMSAALevel--;
+#endif
 	RwD3D8EngineSetMultiSamplingLevels(1 << FrontEndMenuManager.m_nPrefsMSAALevel);
 #endif
 	return TRUE;
@@ -2028,6 +2047,10 @@ WinMain(HINSTANCE instance,
 	}
 #endif
 
+#ifdef FIX_BUGS
+	CheckGameData();
+#endif
+
 #ifdef USE_CUSTOM_ALLOCATOR
 	InitMemoryMgr();
 #endif
@@ -2104,6 +2127,13 @@ WinMain(HINSTANCE instance,
 	 */
 	if( rsEVENTERROR == RsEventHandler(rsRWINITIALIZE, PSGLOBAL(window)) )
 	{
+#ifdef FIX_BUGS
+		// usually caused by video settings this PC can't use, move them away so the next start uses the defaults
+		MoveFileExA("reVC.ini", "reVC.ini.bak", MOVEFILE_REPLACE_EXISTING);
+		MessageBoxA(nil, "Couldn't start the renderer with the saved video settings.\n\n"
+			"They were moved to reVC.ini.bak, start the game again to use the default settings.",
+			"reVC", MB_OK | MB_ICONERROR);
+#endif
 		DestroyWindow(PSGLOBAL(window));
 
 		RsEventHandler(rsTERMINATE, nil);

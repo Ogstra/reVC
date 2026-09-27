@@ -373,10 +373,19 @@ CPhysical::ProcessControl(void)
 		   IsPed() && !bPedPhysics){
 			m_vecMoveSpeedAvg = (m_vecMoveSpeedAvg + m_vecMoveSpeed)/2.0f;
 			m_vecTurnSpeedAvg = (m_vecTurnSpeedAvg + m_vecTurnSpeed)/2.0f;
+#ifdef FIX_HIGH_FPS_BUGS
+			// the limit is a per frame distance, don't make it stricter above 30 fps
+			float step = Max(CTimer::GetTimeStep(), CTimer::GetDefaultTimeStep()) * 0.003f;
+#else
 			float step = CTimer::GetTimeStep() * 0.003f;
+#endif
 			if(m_vecMoveSpeedAvg.MagnitudeSqr() < step*step &&
 			   m_vecTurnSpeedAvg.MagnitudeSqr() < step*step){
+#ifdef FIX_HIGH_FPS_BUGS
+				m_nStaticFrames += CTimer::GetSimFramesPassed();
+#else
 				m_nStaticFrames++;
+#endif
 				if(m_nStaticFrames > 10){
 					m_nStaticFrames = 10;
 					SetIsStatic(true);
@@ -614,14 +623,6 @@ CPhysical::ApplyCollision(CPhysical *B, CColPoint &colpoint, float &impulseA, fl
 	}
 
 	float speedA, speedB;
-#ifdef FIX_BUGS
-	// Keep player-on-foot pushing force against parked/wrecked vehicles consistent above 30 FPS.
-	const bool playerPedPushesVehicleA = A->IsPed() && ((CPed*)A)->IsPlayer() && B->IsVehicle() &&
-		(B->GetStatus() == STATUS_ABANDONED || B->GetStatus() == STATUS_WRECKED || A->bHasHitWall);
-	const bool playerPedPushesVehicleB = B->IsPed() && ((CPed*)B)->IsPlayer() && A->IsVehicle() &&
-		(A->GetStatus() == STATUS_ABANDONED || A->GetStatus() == STATUS_WRECKED || B->bHasHitWall);
-	const float pedVehiclePushScale = Min(CTimer::GetTimeStepFix(), 1.0f);
-#endif
 	if(B->GetIsStatic() && !foo){
 		if(A->bPedPhysics){
 			speedA = DotProduct(A->m_vecMoveSpeed, colpoint.normal);
@@ -791,11 +792,12 @@ CPhysical::ApplyCollision(CPhysical *B, CColPoint &colpoint, float &impulseA, fl
 				}
 				A->ApplyMoveForce(fA);
 			}
-			if(!B->bInfiniteMass && !ispedcontactB){
-#ifdef FIX_BUGS
-				if(playerPedPushesVehicleA)
-					fB *= pedVehiclePushScale;
+#ifdef FIX_HIGH_FPS_BUGS
+			// A walking ped gets its speed back from the animation every frame, so while it keeps walking
+			// into B this impulse is applied once per frame and pushes B harder the higher the frame rate.
+			fB *= Min(CTimer::GetFrameTimeStepFix(), 1.0f);
 #endif
+			if(!B->bInfiniteMass && !ispedcontactB){
 				B->ApplyMoveForce(fB);
 				B->ApplyTurnForce(fB, pointposB);
 			}
@@ -822,11 +824,11 @@ CPhysical::ApplyCollision(CPhysical *B, CColPoint &colpoint, float &impulseA, fl
 			impulseB = -(eB - speedB) * mB;
 			CVector fA = colpoint.normal*(impulseA/massFactorA);
 			CVector fB = colpoint.normal*(-impulseB/massFactorB);
-			if(!A->bInfiniteMass && !ispedcontactA){
-#ifdef FIX_BUGS
-				if(playerPedPushesVehicleB)
-					fA *= pedVehiclePushScale;
+#ifdef FIX_HIGH_FPS_BUGS
+			// see above, B is the walking ped here
+			fA *= Min(CTimer::GetFrameTimeStepFix(), 1.0f);
 #endif
+			if(!A->bInfiniteMass && !ispedcontactA){
 				if(fA.z < 0.0f) fA.z = 0.0f;
 				A->ApplyMoveForce(fA);
 				A->ApplyTurnForce(fA, pointposA);
@@ -1242,6 +1244,7 @@ CPhysical::ApplyFriction(float adhesiveLimit, CColPoint &colpoint)
 			if(fOtherSpeed > 0.1f &&
 			   colpoint.surfaceB != SURFACE_GRASS && colpoint.surfaceB != SURFACE_MUD_DRY &&
 			   CSurfaceTable::GetAdhesionGroup(colpoint.surfaceA) == ADHESIVE_HARD){
+				CONTINUOUS_PARTICLE_EMITTER;
 				CVector v = frictionDir * fOtherSpeed * 0.25f;
 				for(int i = 0; i < 4; i++)
 					CParticle::AddParticle(PARTICLE_SPARK_SMALL, colpoint.point, v);
