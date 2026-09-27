@@ -10,6 +10,7 @@ on:
 
 env:
   GAME: reVC
+  GLFW_VERSION: "3.3.8"
 
 permissions:
   contents: write
@@ -40,32 +41,90 @@ jobs:
           name: linux-x64
           path: ${{ env.GAME }}-linux-x64.tar.gz
 
-  windows-x64:
+  linux-x86:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      # Ubuntu no longer ships 32 bit development libraries (GLFW etc.), Debian still has a complete i386 port
+      - name: Build in 32 bit Debian
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src i386/debian:bookworm linux32 bash -c "
+            set -e
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+              build-essential cmake ninja-build pkg-config libglfw3-dev libopenal-dev libmpg123-dev libsndfile1-dev
+            cmake -S . -B build32 -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
+            cmake --build build32
+            chown -R $(id -u):$(id -g) build32"
+      - name: Package
+        run: |
+          file build32/src/${GAME}
+          mkdir -p package
+          cp -r gamefiles/. package/
+          cp build32/src/${GAME} package/
+          tar -czf ${GAME}-linux-x86.tar.gz -C package .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86
+          path: ${{ env.GAME }}-linux-x86.tar.gz
+
+  windows:
     runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, x86]
+        renderer: [d3d9, gl3]
+        include:
+          - arch: x64
+            premake_arch: amd64
+            dist: Win64
+            glfw: WIN64
+          - arch: x86
+            premake_arch: x86
+            dist: Win32
+            glfw: WIN32
+          - renderer: d3d9
+            premake_renderer: librw_d3d9
+          - renderer: gl3
+            premake_renderer: librw_gl3_glfw
+    env:
+      PLATFORM: win-${{ matrix.premake_arch }}-${{ matrix.premake_renderer }}-oal
+      PACKAGE: ${{ github.workspace }}/package
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: microsoft/setup-msbuild@v2
+      - name: Download GLFW
+        if: matrix.renderer == 'gl3'
+        shell: pwsh
+        run: |
+          $name = "glfw-$env:GLFW_VERSION.bin.${{ matrix.glfw }}"
+          Invoke-WebRequest "https://github.com/glfw/glfw/releases/download/$env:GLFW_VERSION/$name.zip" -OutFile glfw.zip
+          Expand-Archive glfw.zip -DestinationPath .
+          Rename-Item $name glfw
       - name: Build
         shell: pwsh
         run: |
-          ./premake5 vs2019 --with-librw --no-full-paths
+          ./premake5 vs2019 --with-librw --no-full-paths --glfwdir64=glfw --glfwdir32=glfw
           # the bundled premake only knows vs2019, build with the toolset this runner has
-          msbuild -m build/$env:GAME.sln /property:Configuration=Release /property:Platform=win-amd64-librw_d3d9-oal /property:PlatformToolset=v143
+          msbuild -m build/$env:GAME.sln /property:Configuration=Release /property:Platform=$env:PLATFORM /property:PlatformToolset=v143
       - name: Package
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force package | Out-Null
-          Copy-Item -Recurse gamefiles/* package/
-          Copy-Item bin/win-amd64-librw_d3d9-oal/Release/$env:GAME.exe package/
-          Copy-Item vendor/mpg123/dist/Win64/libmpg123-0.dll package/
-          Copy-Item vendor/openal-soft/dist/Win64/OpenAL32.dll package/
-          Compress-Archive -Path package/* -DestinationPath "$env:GAME-windows-x64.zip"
+          New-Item -ItemType Directory -Force $env:PACKAGE | Out-Null
+          Copy-Item -Recurse gamefiles/* $env:PACKAGE/
+          Copy-Item bin/$env:PLATFORM/Release/$env:GAME.exe $env:PACKAGE/
+          Copy-Item vendor/mpg123/dist/${{ matrix.dist }}/libmpg123-0.dll $env:PACKAGE/
+          Copy-Item vendor/openal-soft/dist/${{ matrix.dist }}/OpenAL32.dll $env:PACKAGE/
+          Compress-Archive -Path "$env:PACKAGE/*" -DestinationPath "$env:GAME-windows-${{ matrix.arch }}-${{ matrix.renderer }}.zip"
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-x64
-          path: ${{ env.GAME }}-windows-x64.zip
+          name: windows-${{ matrix.arch }}-${{ matrix.renderer }}
+          path: ${{ env.GAME }}-windows-${{ matrix.arch }}-${{ matrix.renderer }}.zip
 
   macos-arm64:
     runs-on: macos-14
@@ -94,7 +153,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [linux-x64, windows-x64, macos-arm64]
+    needs: [linux-x64, linux-x86, windows, macos-arm64]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
