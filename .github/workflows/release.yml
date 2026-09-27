@@ -34,21 +34,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Ubuntu 20.04 has glibc 2.31, so the binary also runs on older distributions
           - arch: x64
-            image: debian:bullseye
+            image: ubuntu:20.04
             shell: ""
+          # Ubuntu has no 32 bit development libraries (GLFW etc.), Debian still has a complete i386 port
           - arch: x86
-            # Ubuntu no longer ships 32 bit development libraries (GLFW etc.), Debian still has a complete i386 port
-            image: i386/debian:bullseye
+            image: i386/debian:bookworm
             shell: linux32
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
-      # Debian 11 has glibc 2.31, so the binaries also run on older distributions
-      - name: Build in Debian 11
+      - name: Build in ${{ matrix.image }}
         run: |
-          docker run --rm -v "$PWD:/src" -w /src -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) ${{ matrix.image }} ${{ matrix.shell }} bash .github/scripts/build-debian.sh
+          docker run --rm -v "$PWD:/src" -w /src -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) ${{ matrix.image }} ${{ matrix.shell }} bash .github/scripts/build-linux.sh
       - name: Package
         run: |
           file build/src/${GAME}
