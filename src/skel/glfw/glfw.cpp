@@ -1910,12 +1910,63 @@ WinMain(HINSTANCE instance,
 #endif
 
 #else
+#if defined(FIX_BUGS) && !defined(_WIN32) && !defined(__SWITCH__)
+#include <unistd.h>
+#include <limits.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
+// All game files are opened relative to the working directory. Launching the executable from a file
+// manager (e.g. double click in Finder) starts it in the home directory, so nothing is found and the
+// game crashes. If the game data isn't in the working directory but next to the executable, go there.
+static void
+ChangeToGameDirectory(void)
+{
+	if(access("models", F_OK) == 0 || access("MODELS", F_OK) == 0)
+		return;
+
+	char exePath[PATH_MAX];
+#ifdef __APPLE__
+	uint32_t size = sizeof(exePath);
+	if(_NSGetExecutablePath(exePath, &size) != 0)
+		return;
+#else
+	ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+	if(len <= 0)
+		return;
+	exePath[len] = '\0';
+#endif
+	char dir[PATH_MAX];
+	if(realpath(exePath, dir) == nil)
+		return;
+	char *slash = strrchr(dir, '/');
+	if(slash == nil)
+		return;
+	*slash = '\0';
+
+	char models[PATH_MAX + 16];
+	snprintf(models, sizeof(models), "%s/models", dir);
+	if(access(models, F_OK) != 0){
+		snprintf(models, sizeof(models), "%s/MODELS", dir);
+		if(access(models, F_OK) != 0)
+			return;
+	}
+	if(chdir(dir) == 0)
+		printf("Changed working directory to the game directory %s\n", dir);
+}
+#endif
+
 int
 main(int argc, char *argv[])
 {
 #endif
 	RwV2d pos;
 	RwInt32 i;
+
+#if defined(FIX_BUGS) && !defined(_WIN32) && !defined(__SWITCH__)
+	ChangeToGameDirectory();
+#endif
 
 #ifdef USE_CUSTOM_ALLOCATOR
 	InitMemoryMgr();
