@@ -79,8 +79,9 @@ bool bDidWeProcessAnyCinemaCam;
 CCamera::CCamera(void)
 {
 #if GTA_VERSION >= GTA3_PC_11 || defined(FIX_BUGS)
-	m_fMouseAccelHorzntl = 0.0025f;
-	m_fMouseAccelVertical = 0.003f;
+	// half the original mouse sensitivity by default (was 0.0025 / 0.003)
+	m_fMouseAccelHorzntl = 0.00125f;
+	m_fMouseAccelVertical = 0.00175f;
 #endif
 	Init();
 }

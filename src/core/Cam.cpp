@@ -30,7 +30,7 @@ bool PrintDebugCode = false;
 int16 DebugCamMode;
 
 #ifdef FREE_CAM
-bool CCamera::bFreeCam = false;
+bool CCamera::bFreeCam = true;	// free camera on by default
 int nPreviousMode = -1;
 #endif
 
@@ -4855,7 +4855,14 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 	float colMaxZ = carCol->boundingBox.max.z;  // As opposed to LCS and SA, VC does this: carCol->boundingBox.max.z - carCol->boundingBox.min.z;
 	float approxCarLength = 2.0f * Abs(carCol->boundingBox.min.y); // SA taxi min.y = -2.95, max.z = 0.883502f
 
+#ifdef FIX_BUGS
+	// Use the same distance as the fixed camera (Cam_On_A_String_Unobscured), so switching between
+	// the two doesn't move the camera closer or further away
+	CVector carDimensions = carCol->boundingBox.max - carCol->boundingBox.min;
+	float newDistance = carDimensions.Magnitude2D() + 0.1f + TheCamera.CarZoomValueSmooth;
+#else
 	float newDistance = TheCamera.CarZoomValueSmooth + CARCAM_SET[camSetArrPos][1] + approxCarLength;
+#endif
 
 	float minDistForThisCar = approxCarLength * CARCAM_SET[camSetArrPos][3];
 
@@ -4863,7 +4870,9 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 		float radiusToStayOutside = colMaxZ * CARCAM_SET[camSetArrPos][0] - CARCAM_SET[camSetArrPos][2];
 		if (radiusToStayOutside > 0.0f) {
 			TargetCoors.z += radiusToStayOutside;
+#ifndef FIX_BUGS
 			newDistance += radiusToStayOutside;
+#endif
 			zoomModeAlphaOffset += 0.3f / newDistance * radiusToStayOutside;
 		}
 	} else {
