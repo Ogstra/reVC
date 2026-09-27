@@ -730,7 +730,7 @@ Menu::update(void)
 		this->r.w = maxNameWidth + maxValWidth + gap*fontscale;
 
 	this->scrollUpR = this->r;
-	this->scrollUpR.h = 16;
+	this->scrollUpR.h = 16*fontscale;
 	this->scrollDownR = this->scrollUpR;
 	this->scrollDownR.y = bottomy;
 
@@ -1158,8 +1158,8 @@ drawArrow(RwRect r, int direction, int style)
 	int width = RwRasterGetWidth(arrow);
 	int height = RwRasterGetHeight(arrow);
 
-	int left = r.x + (r.w - width)/2;
-	int right = left + width;
+	int left = r.x + (r.w - width*fontscale)/2;
+	int right = left + width*fontscale;
 	int top = r.y;
 	int bottom = r.y+r.h;
 
@@ -1258,14 +1258,16 @@ drawMouse(void)
 	cam = RwCameraGetCurrentCamera();
 	float x = mouseX;
 	float y = mouseY;
-	float w = RwRasterGetWidth(cursor);
-	float h = RwRasterGetHeight(cursor);
+	float texW = RwRasterGetWidth(cursor);
+	float texH = RwRasterGetHeight(cursor);
+	float w = texW*fontscale;
+	float h = texH*fontscale;
 	float recipz = 1.0f/RwCameraGetNearClipPlane(cam);
 
-	float umin = HALFPX / w;
-	float vmin = HALFPX / h;
-	float umax = (w + HALFPX) / w;
-	float vmax = (h + HALFPX) / h;
+	float umin = HALFPX / texW;
+	float vmin = HALFPX / texH;
+	float umax = (texW + HALFPX) / texW;
+	float vmax = (texH + HALFPX) / texH;
 
 	vert = vertices;
 	RwIm2DVertexSetScreenX(vert, x);
