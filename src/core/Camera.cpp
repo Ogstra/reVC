@@ -736,6 +736,20 @@ CCamera::Process(void)
 		m_PreviousCameraPosition = GetPosition();
 		m_bJustInitalised = false;
 	}
+#ifdef FIX_HIGH_FPS_BUGS
+	// The average speed is compared against thresholds made for the distance moved in one 30 fps frame
+	// (rain on the lens, ped chat, weather), so measure it in 30 fps frames of game time.
+	static float TimeSoFar = 0.0f;
+	m_CameraSpeedSoFar += (GetPosition() - m_PreviousCameraPosition).Magnitude();
+	TimeSoFar += CTimer::GetTimeStepFix();
+	m_iNumFramesSoFar++;
+	if(TimeSoFar >= m_iWorkOutSpeedThisNumFrames){
+		m_CameraAverageSpeed = m_CameraSpeedSoFar / TimeSoFar;
+		m_CameraSpeedSoFar = 0.0f;
+		m_iNumFramesSoFar = 0;
+		TimeSoFar = 0.0f;
+	}
+#else
 	m_CameraSpeedSoFar += (GetPosition() - m_PreviousCameraPosition).Magnitude();
 	m_iNumFramesSoFar++;
 	if(m_iNumFramesSoFar == m_iWorkOutSpeedThisNumFrames){
@@ -743,6 +757,7 @@ CCamera::Process(void)
 		m_CameraSpeedSoFar = 0.0f;
 		m_iNumFramesSoFar = 0;
 	}
+#endif
 	m_PreviousCameraPosition = GetPosition();
 
 	// PS2 normalizes a CVector2D GetForward() here. is it used anywhere?
