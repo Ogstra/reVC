@@ -397,7 +397,12 @@ RsInitialize(void)
 	 */
 	RwBool              result;
 
+#ifdef FIX_BUGS
+	// tell it apart from the original game (task bar, Discord)
+	RsGlobal.appName = RWSTRING("GTA: Vice City (reVC)");
+#else
 	RsGlobal.appName = RWSTRING("GTA: Vice City");
+#endif
 	RsGlobal.maximumWidth = DEFAULT_SCREEN_WIDTH;
 	RsGlobal.maximumHeight = DEFAULT_SCREEN_HEIGHT;
 	RsGlobal.width = DEFAULT_SCREEN_WIDTH;
