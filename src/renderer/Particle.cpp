@@ -1217,8 +1217,14 @@ void CParticle::Update()
 						{
 							if ( vecMoveStep.Magnitude() > 0.4f && vecMoveStep.Magnitude() < 0.8f )
 							{
+#ifdef FIX_HIGH_FPS_BUGS
+								// the average speed is per 30 fps frame
+								vecMoveStep.x += TheCamera.m_CameraAverageSpeed * 1.5f * CTimer::GetTimeStepFix();
+								vecMoveStep.y += TheCamera.m_CameraAverageSpeed * 1.5f * CTimer::GetTimeStepFix();
+#else
 								vecMoveStep.x += TheCamera.m_CameraAverageSpeed * 1.5f;
 								vecMoveStep.y += TheCamera.m_CameraAverageSpeed * 1.5f;
+#endif
 							}
 							else if ( vecMoveStep.Magnitude() != 0.0f )
 							{
