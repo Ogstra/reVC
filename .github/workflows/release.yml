@@ -1,0 +1,107 @@
+name: Release
+
+# Builds the game for every supported platform and publishes a GitHub release
+# when a tag starting with "v" is pushed, e.g. git tag v1.1-re3 && git push origin v1.1-re3
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  GAME: re3
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libglfw3-dev libopenal-dev libmpg123-dev libsndfile1-dev
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
+          cmake --build build
+      - name: Package
+        run: |
+          mkdir -p package
+          cp -r gamefiles/. package/
+          cp build/src/${GAME} package/
+          tar -czf ${GAME}-linux-x64.tar.gz -C package .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: ${{ env.GAME }}-linux-x64.tar.gz
+
+  windows-x64:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: microsoft/setup-msbuild@v2
+      - name: Build
+        shell: pwsh
+        run: |
+          ./premake5 vs2019 --with-librw --no-full-paths
+          # the bundled premake only knows vs2019, build with the toolset this runner has
+          msbuild -m build/$env:GAME.sln /property:Configuration=Release /property:Platform=win-amd64-librw_d3d9-oal /property:PlatformToolset=v143
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item -Recurse gamefiles/* package/
+          Copy-Item bin/win-amd64-librw_d3d9-oal/Release/$env:GAME.exe package/
+          Copy-Item vendor/mpg123/dist/Win64/libmpg123-0.dll package/
+          Copy-Item vendor/openal-soft/dist/Win64/OpenAL32.dll package/
+          Compress-Archive -Path package/* -DestinationPath "$env:GAME-windows-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: ${{ env.GAME }}-windows-x64.zip
+
+  macos-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install dependencies
+        run: brew install ninja glfw openal-soft mpg123 dylibbundler
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
+          cmake --build build
+      - name: Package
+        run: |
+          mkdir -p package
+          cp -r gamefiles/. package/
+          cp build/src/${GAME} package/
+          # ship the Homebrew libraries (OpenAL Soft, GLFW, mpg123) next to the binary
+          dylibbundler -od -b -x package/${GAME} -d package/libs -p @executable_path/libs/
+          (cd package && zip -r -y ../${GAME}-macos-arm64.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: ${{ env.GAME }}-macos-arm64.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [linux-x64, windows-x64, macos-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
