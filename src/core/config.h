@@ -278,6 +278,9 @@ enum Config {
 #endif
 
 #define FIX_BUGS		// fixes bugs that we've came across during reversing. You can undefine this only on release builds.
+#ifdef FIX_BUGS
+#define FIX_HIGH_FPS_BUGS	// makes game logic that was tuned for 30 fps behave the same at any frame rate. Requires FIX_BUGS
+#endif
 #define MORE_LANGUAGES		// Add more translations to the game
 #define COMPATIBLE_SAVES // this allows changing structs while keeping saves compatible, and keeps saves compatible between platforms
 #define FIX_INCOMPATIBLE_SAVES // try to fix incompatible saves, requires COMPATIBLE_SAVES

@@ -145,7 +145,12 @@ CObject::ProcessControl(void)
 		m_vecMoveSpeed = CVector(0.0f, 0.0f, 0.0f);
 	}
 	if (mi == MI_RCBOMB) {
+#ifdef FIX_HIGH_FPS_BUGS
+		// turns the bomb into its direction of travel every frame, needs the time step
+		float fTurnForce = -(m_fTurnMass / 20.0f) * CTimer::GetTimeStepFix();
+#else
 		float fTurnForce = -(m_fTurnMass / 20.0f);
+#endif
 		CPhysical::ApplyTurnForce(m_vecMoveSpeed * fTurnForce, -GetForward());
 		float fScalar = 1.0f - m_vecMoveSpeed.MagnitudeSqr() / 5.0f;
 		float fScalarTimed = Pow(fScalar, CTimer::GetTimeStep());
