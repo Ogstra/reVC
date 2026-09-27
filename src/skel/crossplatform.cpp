@@ -451,6 +451,18 @@ void CheckGameData(void)
 #else
 	printf("ERROR: %s", msg);
 	fflush(stdout);
+#ifdef __APPLE__
+	// started from Finder there's no terminal to show the message, use a dialog
+	char script[2048];
+	int n = snprintf(script, sizeof(script), "osascript -e 'display alert \"Game data not found\" message \"");
+	for(const char *c = msg; *c && n < (int)sizeof(script) - 64; c++){
+		if(*c == '\n'){ script[n++] = '\\'; script[n++] = 'n'; }
+		else if(*c == '"' || *c == '\\'){ script[n++] = '\\'; script[n++] = *c; }
+		else if(*c != '\'') script[n++] = *c;
+	}
+	snprintf(script + n, sizeof(script) - n, "\" as critical' >/dev/null 2>&1");
+	system(script);
+#endif
 #endif
 	// global destructors can't run before the game is initialised
 	_Exit(1);
