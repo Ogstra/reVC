@@ -1666,7 +1666,12 @@ cSampleManager::SetChannelLoopPoints(uint32 nChannel, uint32 nLoopStart, int32 n
 {
 	ASSERT( nChannel < NUM_CHANNELS );
 	
+#ifdef FIX_BUGS
+	// -1 means "until the end of the sample", -1 / 2 would turn it into 0 and make the loop points invalid
+	aChannel[nChannel].SetLoopPoints(nLoopStart / (DIGITALBITS / 8), nLoopEnd < 0 ? -1 : nLoopEnd / (DIGITALBITS / 8));
+#else
 	aChannel[nChannel].SetLoopPoints(nLoopStart / (DIGITALBITS / 8), nLoopEnd / (DIGITALBITS / 8));
+#endif
 }
 
 void
