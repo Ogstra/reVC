@@ -3477,6 +3477,7 @@ CPed::PlayFootSteps(void)
 	}
 
 	if (m_nSurfaceTouched == SURFACE_WATER) {
+		CONTINUOUS_PARTICLE_EMITTER;
 		float pedSpeed = CVector2D(m_vecMoveSpeed).Magnitude();
 		if (pedSpeed > 0.03f && CTimer::GetFrameCounter() % 2 == 0 && pedSpeed > 0.13f) {
 #ifdef PC_PARTICLE
@@ -4902,6 +4903,7 @@ CPed::PreRender(void)
 	}
 	if (CWeather::Rain > 0.3f && TheCamera.SoundDistUp > 15.0f) {
 		if ((TheCamera.GetPosition() - GetPosition()).Magnitude() < 25.0f) {
+			CONTINUOUS_PARTICLE_EMITTER;
 			bool doSplashUp = true;
 			CColModel *ourCol = CModelInfo::GetColModel(GetModelIndex());
 			CVector speed = FindPlayerSpeed();

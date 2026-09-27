@@ -1089,6 +1089,7 @@ CPhysical::ApplyFriction(float adhesiveLimit, CColPoint &colpoint)
 			if(fOtherSpeed > 0.1f &&
 			   colpoint.surfaceB != SURFACE_GRASS && colpoint.surfaceB != SURFACE_MUD_DRY &&
 			   CSurfaceTable::GetAdhesionGroup(colpoint.surfaceA) == ADHESIVE_HARD){
+				CONTINUOUS_PARTICLE_EMITTER;
 				CVector v = frictionDir * fOtherSpeed * 0.25f;
 				for(int i = 0; i < 4; i++)
 					CParticle::AddParticle(PARTICLE_SPARK_SMALL, colpoint.point, v);

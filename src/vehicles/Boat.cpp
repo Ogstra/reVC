@@ -216,6 +216,7 @@ CBoat::ProcessControl(void)
 	if(m_fHealth <= 600.0f && GetStatus() != STATUS_WRECKED &&
 	   Abs(GetPosition().x - TheCamera.GetPosition().x) < 200.0f &&
 	   Abs(GetPosition().y - TheCamera.GetPosition().y) < 200.0f){
+		CONTINUOUS_PARTICLE_EMITTER;
 		float speedSq = m_vecMoveSpeed.MagnitudeSqr();
 		CVector smokeDir = 0.8f*m_vecMoveSpeed;
 		CVector smokePos;
@@ -338,6 +339,7 @@ CBoat::ProcessControl(void)
 					}
 
 					// Spray some particles
+					CONTINUOUS_PARTICLE_EMITTER;
 					CVector jetDir = -0.04f * force;
 					if(m_fGasPedal > 0.0f){
 						if(GetStatus() == STATUS_PLAYER){
@@ -471,6 +473,7 @@ CBoat::ProcessControl(void)
 		if(m_nDeltaVolumeUnderWater > 120)
 #endif
 		{
+			CONTINUOUS_PARTICLE_EMITTER;
 			float speed = m_vecMoveSpeed.Magnitude();
 			float splash1Size = speed;
 			float splash2Size = float(m_nDeltaVolumeUnderWater) * 0.005f * 0.2f;

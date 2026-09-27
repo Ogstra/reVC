@@ -286,6 +286,7 @@ void CWeather::ReleaseWeather()
 
 void CWeather::AddRain()
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	if (CCullZones::CamNoRain() || CCullZones::PlayerNoRain())
 		return;
 	if (TheCamera.GetLookingLRBFirstPerson()) {

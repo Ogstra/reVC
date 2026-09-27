@@ -88,6 +88,7 @@ CExplosion::GetExplosionPosition(uint8 id)
 bool
 CExplosion::AddExplosion(CEntity *explodingEntity, CEntity *culprit, eExplosionType type, const CVector &pos, uint32 lifetime)
 {
+	ONE_SHOT_PARTICLE_EMITTER;
 	CVector pPosn;
 	CVector posGround;
 
@@ -314,6 +315,7 @@ CExplosion::AddExplosion(CEntity *explodingEntity, CEntity *culprit, eExplosionT
 void
 CExplosion::Update()
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	RwRGBA color = colUpdate;
 	for (int i = 0; i < ARRAY_SIZE(gaExplosion); i++) {
 		CExplosion &explosion = gaExplosion[i];
