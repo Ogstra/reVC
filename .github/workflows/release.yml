@@ -48,18 +48,7 @@ jobs:
       # Debian 11 has glibc 2.31, so the binaries also run on older distributions
       - name: Build in Debian 11
         run: |
-          docker run --rm -v "$PWD:/src" -w /src ${{ matrix.image }} ${{ matrix.shell }} bash -c "
-            set -e
-            # bullseye moves to archive.debian.org once it's no longer supported
-            if ! apt-get update; then
-              sed -i -e 's|deb.debian.org|archive.debian.org|g' -e '/security/d' /etc/apt/sources.list
-              apt-get update
-            fi
-            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-              build-essential cmake ninja-build pkg-config libglfw3-dev libopenal-dev libmpg123-dev libsndfile1-dev
-            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
-            cmake --build build
-            chown -R $(id -u):$(id -g) build"
+          docker run --rm -v "$PWD:/src" -w /src -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) ${{ matrix.image }} ${{ matrix.shell }} bash .github/scripts/build-debian.sh
       - name: Package
         run: |
           file build/src/${GAME}
