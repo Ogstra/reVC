@@ -399,7 +399,7 @@ RsInitialize(void)
 
 #ifdef FIX_BUGS
 	// tell it apart from the original game (task bar, Discord)
-	RsGlobal.appName = RWSTRING("GTA: Vice City (reVC)");
+	RsGlobal.appName = RWSTRING("reVC");
 #else
 	RsGlobal.appName = RWSTRING("GTA: Vice City");
 #endif
