@@ -1,0 +1,221 @@
+name: Release
+
+# Builds the game for every supported platform (also for pull requests) and publishes a GitHub release
+# when a tag starting with "v" is pushed, e.g. git tag v1.1-miami && git push origin v1.1-miami
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GAME: reVC
+  GLFW_VERSION: "3.3.8"
+  OPENAL_VERSION: "1.23.1"
+  MPG123_VERSION: "1.32.10"
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Time step conversions
+        run: |
+          c++ -std=c++11 -Wall -Werror -I src/core -o timestep_test tests/timestep_test.cpp
+          ./timestep_test
+
+  linux:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 20.04 has glibc 2.31, so the binary also runs on older distributions
+          - arch: x64
+            image: ubuntu:20.04
+            shell: ""
+          # Ubuntu has no 32 bit development libraries (GLFW etc.), Debian still has a complete i386 port
+          - arch: x86
+            image: i386/debian:bookworm
+            shell: linux32
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Build in ${{ matrix.image }}
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) ${{ matrix.image }} ${{ matrix.shell }} bash .github/scripts/build-linux.sh
+      - name: Package
+        run: |
+          file build/src/${GAME}
+          mkdir -p package
+          cp -r gamefiles/. package/
+          cp -r licenses package/
+          cp build/src/${GAME} package/
+          tar -czf ${GAME}-linux-${{ matrix.arch }}.tar.gz -C package .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: ${{ env.GAME }}-linux-${{ matrix.arch }}.tar.gz
+
+  windows:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, x86]
+        renderer: [d3d9, gl3]
+        include:
+          - arch: x64
+            premake_arch: amd64
+            dist: Win64
+            glfw: WIN64
+          - arch: x86
+            premake_arch: x86
+            dist: Win32
+            glfw: WIN32
+          - renderer: d3d9
+            premake_renderer: librw_d3d9
+          - renderer: gl3
+            premake_renderer: librw_gl3_glfw
+    env:
+      PLATFORM: win-${{ matrix.premake_arch }}-${{ matrix.premake_renderer }}-oal
+      PACKAGE: ${{ github.workspace }}/package
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: microsoft/setup-msbuild@v2
+      - name: Download GLFW
+        if: matrix.renderer == 'gl3'
+        shell: pwsh
+        run: |
+          $name = "glfw-$env:GLFW_VERSION.bin.${{ matrix.glfw }}"
+          Invoke-WebRequest "https://github.com/glfw/glfw/releases/download/$env:GLFW_VERSION/$name.zip" -OutFile glfw.zip
+          Expand-Archive glfw.zip -DestinationPath .
+          Rename-Item $name glfw
+      - name: Build
+        shell: pwsh
+        run: |
+          ./premake5 vs2019 --with-librw --no-full-paths --glfwdir64=glfw --glfwdir32=glfw
+          # the bundled premake only knows vs2019, build with the toolset this runner has
+          msbuild -m build/$env:GAME.sln /property:Configuration=Release /property:Platform=$env:PLATFORM /property:PlatformToolset=v143
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force $env:PACKAGE | Out-Null
+          Copy-Item -Recurse gamefiles/* $env:PACKAGE/
+          Copy-Item -Recurse licenses $env:PACKAGE/
+          Copy-Item bin/$env:PLATFORM/Release/$env:GAME.exe $env:PACKAGE/
+          # symbols, so crash offsets from the Windows event log can be mapped to source lines
+          Copy-Item bin/$env:PLATFORM/Release/$env:GAME.pdb $env:PACKAGE/
+          Copy-Item vendor/mpg123/dist/${{ matrix.dist }}/libmpg123-0.dll $env:PACKAGE/
+          Copy-Item vendor/openal-soft/dist/${{ matrix.dist }}/OpenAL32.dll $env:PACKAGE/
+          Compress-Archive -Path "$env:PACKAGE/*" -DestinationPath "$env:GAME-windows-${{ matrix.arch }}-${{ matrix.renderer }}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}-${{ matrix.renderer }}
+          path: ${{ env.GAME }}-windows-${{ matrix.arch }}-${{ matrix.renderer }}.zip
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+            min_macos: "11.0"
+          - arch: x64
+            runner: macos-15-intel
+            cmake_arch: x86_64
+            min_macos: "10.15"
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install tools
+        run: brew install ninja dylibbundler
+      # Homebrew's libraries only run on the macOS version of the runner, build them for older versions
+      - name: Build dependencies
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.min_macos }}
+        run: |
+          DEPS=$PWD/deps
+          curl -sSfL https://github.com/glfw/glfw/archive/refs/tags/$GLFW_VERSION.tar.gz | tar xz
+          cmake -S glfw-$GLFW_VERSION -B build-glfw -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$DEPS \
+            -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_DOCS=OFF
+          cmake --build build-glfw --target install
+          curl -sSfL https://github.com/kcat/openal-soft/archive/refs/tags/$OPENAL_VERSION.tar.gz | tar xz
+          cmake -S openal-soft-$OPENAL_VERSION -B build-openal -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$DEPS \
+            -DALSOFT_EXAMPLES=OFF -DALSOFT_UTILS=OFF -DALSOFT_TESTS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          cmake --build build-openal --target install
+          curl -sSfL -o mpg123.tar.bz2 https://downloads.sourceforge.net/project/mpg123/mpg123/$MPG123_VERSION/mpg123-$MPG123_VERSION.tar.bz2 ||
+            curl -sSfL -o mpg123.tar.bz2 https://www.mpg123.de/download/mpg123-$MPG123_VERSION.tar.bz2
+          tar xjf mpg123.tar.bz2
+          (cd mpg123-$MPG123_VERSION && ./configure --prefix=$DEPS --disable-static && make -j4 && make install)
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_arch || matrix.arch }} \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.min_macos }} -DCMAKE_PREFIX_PATH=$PWD/deps -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
+          cmake --build build
+          otool -L build/src/${GAME}
+      - name: Package
+        run: |
+          APP=package/${GAME}.app
+          mkdir -p $APP/Contents/MacOS $APP/Contents/Frameworks
+          cp build/src/${GAME} $APP/Contents/MacOS/
+          cat > $APP/Contents/Info.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key><string>${GAME}</string>
+            <key>CFBundleIdentifier</key><string>io.github.ogstra.${GAME}</string>
+            <key>CFBundleName</key><string>${GAME}</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>${GITHUB_REF_NAME}</string>
+            <key>CFBundleVersion</key><string>${GITHUB_RUN_NUMBER}</string>
+            <key>LSMinimumSystemVersion</key><string>${{ matrix.min_macos }}</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          EOF
+          # ship the libraries (OpenAL Soft, GLFW, mpg123) inside the app
+          dylibbundler -od -b -x $APP/Contents/MacOS/${GAME} -d $APP/Contents/Frameworks -p @executable_path/../Frameworks/ -s $PWD/deps/lib
+          # bundling rewrote the libraries, sign everything again (ad-hoc, arm64 refuses to run unsigned code)
+          codesign --force --deep --sign - $APP
+          codesign --verify --deep --strict $APP
+          cp -r gamefiles/. package/
+          cp -r licenses package/
+          cat > package/README-macOS.txt <<EOF
+          Copy ${GAME}.app and the other files into the folder of your PC copy of the game
+          (the one containing the models and data folders), then open ${GAME}.app.
+
+          The app isn't notarized by Apple. If macOS says it can't be opened, right click it
+          and choose Open, or run this in Terminal from the game folder:
+            xattr -dr com.apple.quarantine ${GAME}.app
+          EOF
+          (cd package && zip -r -y ../${GAME}-macos-${{ matrix.arch }}.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: ${{ env.GAME }}-macos-${{ matrix.arch }}.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [tests, linux, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

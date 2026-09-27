@@ -2325,7 +2325,12 @@ CPed::ProcessControl(void)
 				forceDir = m_vecDamageNormal;
 				forceDir.z = 0.0f;
 				if (!bIsStanding) {
+#ifdef FIX_HIGH_FPS_BUGS
+					// applied every frame while touching, and the speed isn't reset while not standing
+					forceDir *= 4.0f * CTimer::GetTimeStepFix();
+#else
 					forceDir *= 4.0f;
+#endif
 				} else {
 					forceDir *= 0.5f;
 				}
@@ -2434,6 +2439,10 @@ CPed::ProcessControl(void)
 						forceDir = m_vecDamageNormal;
 						forceDir.z = 0.0f;
 						forceDir.Normalise();
+#ifdef FIX_HIGH_FPS_BUGS
+						// applied every frame while in the air against a slope
+						forceDir *= CTimer::GetTimeStepFix();
+#endif
 						if (m_nPedState != PED_JUMP || m_nWaitTimer >= 300) {
 							ApplyMoveForce(2.0f * forceDir);
 						} else {
@@ -3359,6 +3368,7 @@ CPed::PlayFootSteps(void)
 
 	if (m_nSurfaceTouched == SURFACE_WATER) {
 		CRGBA rubberSmokeColor(255, 255, 255, 196);
+		CONTINUOUS_PARTICLE_EMITTER;
 		float pedSpeed = CVector2D(m_vecMoveSpeed).Magnitude();
 		if (pedSpeed > 0.03f && CTimer::GetFrameCounter() % 2 == 0 && pedSpeed > 0.13f) {
 			float particleSize = pedSpeed * 2.0f;
@@ -4966,6 +4976,7 @@ CPed::PreRender(void)
 	}
 	if (CWeather::Rain > 0.3f && TheCamera.SoundDistUp > 15.0f) {
 		if ((TheCamera.GetPosition() - GetPosition()).Magnitude() < 25.0f) {
+			CONTINUOUS_PARTICLE_EMITTER;
 			bool doSplashUp = true;
 			CColModel *ourCol = CModelInfo::GetColModel(GetModelIndex());
 			CVector speed = FindPlayerSpeed();

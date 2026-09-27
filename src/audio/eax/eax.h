@@ -50,17 +50,7 @@ extern "C" {
 
 
 #else // AUDIO_OAL
-	#if defined(__has_include)
-		#if __has_include(<AL/al.h>)
-			#include <AL/al.h>
-		#elif __has_include(<OpenAL/al.h>)
-			#include <OpenAL/al.h>
-		#else
-			#include <AL/al.h>
-		#endif
-	#else
-		#include <AL/al.h>
-	#endif
+	#include <AL/al.h>
 	#include <string.h>
 
 	#ifndef GUID_DEFINED

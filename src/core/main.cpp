@@ -172,6 +172,16 @@ ValidateVersion()
 	int32 file = CFileMgr::OpenFile("models\\coll\\peds.col", "rb");
 	char buff[128];
 
+#ifdef FIX_BUGS
+	// OpenFile returns 0 on failure, not -1: without the game data this seeked a null FILE and crashed
+	if ( file == 0 )
+	{
+		printf("ERROR: Game data not found (models/coll/peds.col).\n"
+		       "Put %s in the folder of a complete game installation and run it from there.\n", RsGlobal.appName);
+		fflush(stdout);
+		_Exit(1);
+	}
+#endif
 	if ( file != -1 )
 	{
 		CFileMgr::Seek(file, 100, SEEK_SET);

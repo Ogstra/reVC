@@ -217,10 +217,6 @@ CBike::ProcessControl(void)
 	float brake = 0.0f;
 	CColModel *colModel = GetColModel();
 	float wheelScale = ((CVehicleModelInfo*)CModelInfo::GetModelInfo(GetModelIndex()))->m_wheelScale;
-#ifdef FIX_BUGS
-	const float wheelAirStep = Min(CTimer::GetTimeStepFix(), 1.0f);
-	const float wheelAirDamping = Pow(0.95f, wheelAirStep);
-#endif
 	bWarnedPeds = false;
 	bLeanMatrixClean = false;
 	m_doingBurnout = 0;
@@ -479,11 +475,22 @@ CBike::ProcessControl(void)
 		m_vecMoveSpeedAvg = (m_vecMoveSpeedAvg + m_vecMoveSpeed)/2.0f;
 		m_vecTurnSpeedAvg = (m_vecTurnSpeedAvg + m_vecTurnSpeed)/2.0f;
 
-		if(m_vecMoveSpeedAvg.MagnitudeSqr() <= sq(moveSpeedLimit*CTimer::GetTimeStep()) &&
-		   m_vecTurnSpeedAvg.MagnitudeSqr() <= sq(turnSpeedLimit*CTimer::GetTimeStep()) &&
+#ifdef FIX_HIGH_FPS_BUGS
+		// the limits are per frame distances, don't make them stricter above 30 fps
+		float staticStep = Max(CTimer::GetTimeStep(), CTimer::GetDefaultTimeStep());
+		distanceLimit *= Min(CTimer::GetTimeStepFix(), 1.0f);
+#else
+		float staticStep = CTimer::GetTimeStep();
+#endif
+		if(m_vecMoveSpeedAvg.MagnitudeSqr() <= sq(moveSpeedLimit*staticStep) &&
+		   m_vecTurnSpeedAvg.MagnitudeSqr() <= sq(turnSpeedLimit*staticStep) &&
 		   m_fDistanceTravelled < distanceLimit ||
 		   makeStatic){
+#ifdef FIX_HIGH_FPS_BUGS
+			m_nStaticFrames += CTimer::GetSimFramesPassed();
+#else
 			m_nStaticFrames++;
+#endif
 
 			if(m_nStaticFrames > 10 || makeStatic)
 				if(!CCarCtrl::MapCouldMoveInThisArea(GetPosition().x, GetPosition().y)){
@@ -864,16 +871,16 @@ CBike::ProcessControl(void)
 					m_wheelStatus[BIKEWHEEL_FRONT]);
 				if(bStuckInSand && (WheelState[BIKEWHEEL_FRONT] == WHEEL_STATE_SPINNING || WheelState[BIKEWHEEL_FRONT] == WHEEL_STATE_SKIDDING))
 					WheelState[BIKEWHEEL_FRONT] = WHEEL_STATE_NORMAL;
-				}else{
-					// Wheel in the air
-#ifdef FIX_BUGS
-					m_aWheelSpeed[BIKEWHEEL_FRONT] *= wheelAirDamping;
+			}else{
+				// Wheel in the air
+#ifdef FIX_HIGH_FPS_BUGS
+				m_aWheelSpeed[BIKEWHEEL_FRONT] *= CTimer::ScaleFrameMultiplier(0.95f);
 #else
-					m_aWheelSpeed[BIKEWHEEL_FRONT] *= 0.95f;
+				m_aWheelSpeed[BIKEWHEEL_FRONT] *= 0.95f;
 #endif
-					m_aWheelRotation[BIKEWHEEL_FRONT] += m_aWheelSpeed[BIKEWHEEL_FRONT];
-				}
+				m_aWheelRotation[BIKEWHEEL_FRONT] += m_aWheelSpeed[BIKEWHEEL_FRONT];
 			}
+		}
 
 		// Process rear wheel
 
@@ -944,24 +951,16 @@ CBike::ProcessControl(void)
 			// Wheel in the air
 			if(bIsHandbrakeOn)
 				m_aWheelSpeed[BIKEWHEEL_REAR] = 0.0f;
-				else{
-					if(acceleration > 0.0f){
-						if(m_aWheelSpeed[BIKEWHEEL_REAR] < 2.0f)
-#ifdef FIX_BUGS
-							m_aWheelSpeed[BIKEWHEEL_REAR] -= 0.2f*wheelAirStep;
-#else
-							m_aWheelSpeed[BIKEWHEEL_REAR] -= 0.2f;
-#endif
-					}else{
-						if(m_aWheelSpeed[BIKEWHEEL_REAR] > -2.0f)
-#ifdef FIX_BUGS
-							m_aWheelSpeed[BIKEWHEEL_REAR] += 0.1f*wheelAirStep;
-#else
-							m_aWheelSpeed[BIKEWHEEL_REAR] += 0.1f;
-#endif
-					}
+			else{
+				if(acceleration > 0.0f){
+					if(m_aWheelSpeed[BIKEWHEEL_REAR] < 2.0f)
+						m_aWheelSpeed[BIKEWHEEL_REAR] -= 0.2f;
+				}else{
+					if(m_aWheelSpeed[BIKEWHEEL_REAR] > -2.0f)
+						m_aWheelSpeed[BIKEWHEEL_REAR] += 0.1f;
 				}
-				m_aWheelRotation[BIKEWHEEL_REAR] += m_aWheelSpeed[BIKEWHEEL_REAR];
+			}
+			m_aWheelRotation[BIKEWHEEL_REAR] += m_aWheelSpeed[BIKEWHEEL_REAR];
 		}
 
 		if(m_doingBurnout && m_aWheelState[BIKEWHEEL_REAR] == WHEEL_STATE_SPINNING){
@@ -1022,8 +1021,8 @@ CBike::ProcessControl(void)
 					WheelState[BIKEWHEEL_FRONT] = WHEEL_STATE_NORMAL;
 			}else{
 				// Wheel in the air
-#ifdef FIX_BUGS
-				m_aWheelSpeed[BIKEWHEEL_FRONT] *= wheelAirDamping;
+#ifdef FIX_HIGH_FPS_BUGS
+				m_aWheelSpeed[BIKEWHEEL_FRONT] *= CTimer::ScaleFrameMultiplier(0.95f);
 #else
 				m_aWheelSpeed[BIKEWHEEL_FRONT] *= 0.95f;
 #endif
@@ -1120,6 +1119,7 @@ CBike::ProcessControl(void)
 	}
 
 	if(m_fHealth < 250.0f && GetStatus() != STATUS_WRECKED){
+		CONTINUOUS_PARTICLE_EMITTER;
 		// Car is on fire
 
 		CVector damagePos, fireDir;
@@ -1303,6 +1303,7 @@ CBike::Teleport(CVector pos)
 void
 CBike::PreRender(void)
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	int i;
 	CVehicleModelInfo *mi = (CVehicleModelInfo*)CModelInfo::GetModelInfo(GetModelIndex());
 

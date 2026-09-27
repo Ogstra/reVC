@@ -8,32 +8,12 @@
 
 #ifdef _WIN32
 #include <io.h>
-#endif
-
-#if defined(__has_include)
-#if __has_include(<AL/al.h>)
-#include <AL/al.h>
-#elif __has_include(<OpenAL/al.h>)
-#include <OpenAL/al.h>
-#else
-#include <AL/al.h>
-#endif
-#if __has_include(<AL/alc.h>)
-#include <AL/alc.h>
-#elif __has_include(<OpenAL/alc.h>)
-#include <OpenAL/alc.h>
-#else
-#include <AL/alc.h>
-#endif
-#else
 #include <AL/al.h>
 #include <AL/alc.h>
-#endif
 #include <AL/alext.h>
 #include <AL/efx.h>
 #include <AL/efx-presets.h>
 
-#ifdef _WIN32
 // for user MP3s
 #include <direct.h>
 #include <shlobj.h>
@@ -875,8 +855,12 @@ cSampleManager::Initialise(void)
 		alcMakeContextCurrent(ALContext);
 	
 		const char* ext=(const char*)alGetString(AL_EXTENSIONS);
-		if ( ext == NULL || strstr(ext,"AL_SOFT_loop_points")==NULL )
-			printf("WARNING: OpenAL extension AL_SOFT_loop_points not available, using software loop-point fallback\n");
+		ASSERT(strstr(ext,"AL_SOFT_loop_points")!=NULL);
+		if ( strstr(ext,"AL_SOFT_loop_points")==NULL )
+		{
+			Terminate();
+			return FALSE;
+		}
 		
 		alListenerf (AL_GAIN,     1.0f);
 		alListener3f(AL_POSITION, 0.0f, 0.0f, 0.0f);
@@ -1682,8 +1666,12 @@ cSampleManager::SetChannelLoopPoints(uint32 nChannel, uint32 nLoopStart, int32 n
 {
 	ASSERT( nChannel < NUM_CHANNELS );
 	
-	int32 loopEnd = nLoopEnd < 0 ? nLoopEnd : nLoopEnd / (DIGITALBITS / 8);
-	aChannel[nChannel].SetLoopPoints(nLoopStart / (DIGITALBITS / 8), loopEnd);
+#ifdef FIX_BUGS
+	// -1 means "until the end of the sample", -1 / 2 would turn it into 0 and make the loop points invalid
+	aChannel[nChannel].SetLoopPoints(nLoopStart / (DIGITALBITS / 8), nLoopEnd < 0 ? -1 : nLoopEnd / (DIGITALBITS / 8));
+#else
+	aChannel[nChannel].SetLoopPoints(nLoopStart / (DIGITALBITS / 8), nLoopEnd / (DIGITALBITS / 8));
+#endif
 }
 
 void
