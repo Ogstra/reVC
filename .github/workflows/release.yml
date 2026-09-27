@@ -118,6 +118,8 @@ jobs:
           New-Item -ItemType Directory -Force $env:PACKAGE | Out-Null
           Copy-Item -Recurse gamefiles/* $env:PACKAGE/
           Copy-Item bin/$env:PLATFORM/Release/$env:GAME.exe $env:PACKAGE/
+          # symbols, so crash offsets from the Windows event log can be mapped to source lines
+          Copy-Item bin/$env:PLATFORM/Release/$env:GAME.pdb $env:PACKAGE/
           Copy-Item vendor/mpg123/dist/${{ matrix.dist }}/libmpg123-0.dll $env:PACKAGE/
           Copy-Item vendor/openal-soft/dist/${{ matrix.dist }}/OpenAL32.dll $env:PACKAGE/
           Compress-Archive -Path "$env:PACKAGE/*" -DestinationPath "$env:GAME-windows-${{ matrix.arch }}-${{ matrix.renderer }}.zip"

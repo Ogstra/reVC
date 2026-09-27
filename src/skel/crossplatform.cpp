@@ -1,3 +1,4 @@
+#define WITHWINDOWS
 #include "common.h"
 #include "crossplatform.h"
 
@@ -435,5 +436,37 @@ ssize_t readlink (const char * __path, char * __buf, size_t __buflen)
 {
    errno = ENOSYS;
    return -1;
+}
+#endif
+
+#ifdef FIX_BUGS
+void CheckGameData(void)
+{
+	static const char *files[] = { "models/gta3.img", "models/gta3.dir", "models/coll/peds.col", "data/default.dat" };
+	char msg[1024];
+	int len = snprintf(msg, sizeof(msg), "Game data not found in the game folder. Missing files:\n\n");
+	bool missing = false;
+	for(int i = 0; i < ARRAY_SIZE(files); i++){
+		FILE *f = fcaseopen(files[i], "rb");
+		if(f)
+			fclose(f);
+		else{
+			missing = true;
+			if(len >= 0 && len < (int)sizeof(msg))
+				len += snprintf(msg + len, sizeof(msg) - len, "  %s\n", files[i]);
+		}
+	}
+	if(!missing)
+		return;
+	if(len >= 0 && len < (int)sizeof(msg))
+		snprintf(msg + len, sizeof(msg) - len, "\nCopy a complete PC installation of the game into this folder and run the game from there.\n");
+#ifdef _WIN32
+	MessageBoxA(nil, msg, "Game data not found", MB_OK | MB_ICONERROR);
+#else
+	printf("ERROR: %s", msg);
+	fflush(stdout);
+#endif
+	// global destructors can't run before the game is initialised
+	_Exit(1);
 }
 #endif

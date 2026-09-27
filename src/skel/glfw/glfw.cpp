@@ -1996,32 +1996,6 @@ ChangeToGameDirectory(void)
 		printf("Changed working directory to the game directory %s\n", dir);
 }
 
-// Without the game data the game crashes somewhere during start up, say what's wrong instead
-static void
-CheckGameData(void)
-{
-	static const char *files[] = { "models/gta3.img", "models/gta3.dir", "models/coll/peds.col", "data/default.dat" };
-	bool missing = false;
-	for(int i = 0; i < ARRAY_SIZE(files); i++){
-		FILE *f = fcaseopen(files[i], "rb");
-		if(f)
-			fclose(f);
-		else{
-			if(!missing){
-				char cwd[PATH_MAX];
-				printf("ERROR: Game data not found in %s\n", getcwd(cwd, sizeof(cwd)) ? cwd : ".");
-			}
-			printf("  missing: %s\n", files[i]);
-			missing = true;
-		}
-	}
-	if(missing){
-		printf("Copy a complete PC installation of the game into this folder and run the game from there.\n");
-		// global destructors can't run before the game is initialised
-		fflush(stdout);
-		_Exit(1);
-	}
-}
 #endif
 
 int
@@ -2033,6 +2007,8 @@ main(int argc, char *argv[])
 
 #if defined(FIX_BUGS) && !defined(_WIN32) && !defined(__SWITCH__)
 	ChangeToGameDirectory();
+#endif
+#ifdef FIX_BUGS
 	CheckGameData();
 #endif
 

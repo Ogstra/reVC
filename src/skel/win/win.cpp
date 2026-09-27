@@ -2028,6 +2028,10 @@ WinMain(HINSTANCE instance,
 	}
 #endif
 
+#ifdef FIX_BUGS
+	CheckGameData();
+#endif
+
 #ifdef USE_CUSTOM_ALLOCATOR
 	InitMemoryMgr();
 #endif
