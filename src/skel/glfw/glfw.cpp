@@ -1038,6 +1038,12 @@ long _InputInitialiseMouse(bool exclusive)
 	// Disabled = keep cursor centered and hide
 	lastCursorMode = exclusive ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_HIDDEN;
 	glfwSetInputMode(PSGLOBAL(window), GLFW_CURSOR, lastCursorMode);
+#if defined(FIX_BUGS) && GLFW_VERSION_MAJOR == 3 && GLFW_VERSION_MINOR >= 3
+	// Read the mouse movement without the OS pointer acceleration, like DirectInput does in the D3D9 build.
+	// The accelerated pointer made the camera feel floaty. Only works while the cursor is disabled.
+	if(glfwRawMouseMotionSupported())
+		glfwSetInputMode(PSGLOBAL(window), GLFW_RAW_MOUSE_MOTION, exclusive ? GLFW_TRUE : GLFW_FALSE);
+#endif
 	return 0;
 }
 
