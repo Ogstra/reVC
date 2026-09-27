@@ -131,8 +131,20 @@ void CChannel::Start()
 	}
 	else
 		alBufferData(alBuffers[id], AL_FORMAT_MONO16, Data, DataSize, Frequency);
+#ifdef FIX_BUGS
+	// Loop points come from sfx.SDT, an end of -1 means the end of the sample. Passing it as is made
+	// OpenAL reject the loop points, so looped sounds (engines etc.) restarted from their beginning.
+	if ( LoopPoints[0] > 0 || LoopPoints[1] > 0 )
+	{
+		ALint numSamples = DataSize / sizeof(int16);
+		ALint loopPoints[2] = { LoopPoints[0], LoopPoints[1] < 0 ? numSamples : LoopPoints[1] };
+		if ( loopPoints[0] >= 0 && loopPoints[0] < loopPoints[1] && loopPoints[1] <= numSamples )
+			alBufferiv(alBuffers[id], AL_LOOP_POINTS_SOFT, loopPoints);
+	}
+#else
 	if ( LoopPoints[0] != 0 && LoopPoints[0] != -1 )
 		alBufferiv(alBuffers[id], AL_LOOP_POINTS_SOFT, LoopPoints);
+#endif
 	alSourcei(alSources[id], AL_BUFFER, alBuffers[id]);
 	alSourcePlay(alSources[id]);
 }

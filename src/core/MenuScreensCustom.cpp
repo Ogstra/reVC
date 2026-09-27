@@ -124,10 +124,10 @@ void RestoreDefGraphics(int8 action) {
 			CStreaming::RequestIslands(CGame::currLevel);
 			CStreaming::LoadAllRequestedModels(true);
 	    	} else
-	    		FrontEndMenuManager.m_PrefsIslandLoading = FrontEndMenuManager.ISLAND_LOADING_LOW;
+	    		FrontEndMenuManager.m_PrefsIslandLoading = FrontEndMenuManager.ISLAND_LOADING_HIGH;
 	#endif
 	#ifdef GRAPHICS_MENU_OPTIONS // otherwise Frontend will handle those
-		CMenuManager::m_PrefsFrameLimiter = true;
+		CMenuManager::m_PrefsFrameLimiter = false;
 		CMenuManager::m_PrefsVsyncDisp = true;
 		CMenuManager::m_PrefsVsync = true;
 		CMenuManager::m_PrefsUseWideScreen = false;
@@ -155,15 +155,15 @@ void RestoreDefDisplay(int8 action) {
 		CMenuManager::m_PrefsCutsceneBorders = true;
 	#endif
 	#ifdef FREE_CAM
-		TheCamera.bFreeCam = false;
+		TheCamera.bFreeCam = true;
 	#endif
 	#ifdef PED_CAR_DENSITY_SLIDERS
 		CIniFile::LoadIniFile();
 	#endif
 	#ifdef GRAPHICS_MENU_OPTIONS // otherwise Frontend will handle those
 		CMenuManager::m_PrefsBrightness = 256;
-		CMenuManager::m_PrefsLOD = 1.2f;
-		CRenderer::ms_lodDistScale = 1.2f;
+		CMenuManager::m_PrefsLOD = 1.8f;
+		CRenderer::ms_lodDistScale = 1.8f;
 		CMenuManager::m_PrefsShowSubtitles = true;
 		FrontEndMenuManager.SaveSettings();
 	#endif

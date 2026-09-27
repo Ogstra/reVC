@@ -448,7 +448,7 @@ int8 CRunningScript::ProcessCommands300To399(int32 command)
 		float sideX = y;
 		float sideY = x;
 		/* Not very nicely named intermediate variables. */
-		CShadows::StoreShadowToBeRendered(ScriptParams[0], &pos, frontX, frontY, sideX, sideY,
+		SCRIPT_DRAW(CShadows, StoreShadowToBeRendered)(ScriptParams[0], &pos, frontX, frontY, sideX, sideY,
 			ScriptParams[6], ScriptParams[7], ScriptParams[8], ScriptParams[9]);
 		return 0;
 	}
@@ -1542,9 +1542,17 @@ int8 CRunningScript::ProcessCommands400To499(int32 command)
 #ifdef FIX_BUGS
 		// don't wanna get stuck in unique stunt jump cam forever
 		bool usj_with_dodo = strcmp(m_abScriptName, "usj") == 0 && pVehicle->GetModelIndex() == MI_DODO;
+		#ifdef FIX_HIGH_FPS_BUGS
+		UpdateCompareFlag(!CTheScripts::HasVehicleCollidedSinceLastTick(pVehicle) && !usj_with_dodo);
+#else
 		UpdateCompareFlag(pVehicle->m_nCollisionRecords == 0 && !usj_with_dodo);
+#endif
+#else
+		#ifdef FIX_HIGH_FPS_BUGS
+		UpdateCompareFlag(!CTheScripts::HasVehicleCollidedSinceLastTick(pVehicle));
 #else
 		UpdateCompareFlag(pVehicle->m_nCollisionRecords == 0);
+#endif
 #endif
 		return 0;
 	}

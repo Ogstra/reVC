@@ -1040,8 +1040,53 @@ void psPostRWinit(void)
 	_InputInitialiseJoys();
 	_InputInitialiseMouse();
 
+#ifdef FIX_BUGS
+	// Window sizes are in screen coordinates, the frame buffer (and so the game) is in pixels. On HiDPI screens
+	// (macOS Retina) one screen coordinate is 2 pixels, so a resolution that matches the screen in pixels
+	// made a window twice as big as the screen and only a quarter of the game was visible.
+	if(!(vm.flags & rwVIDEOMODEEXCLUSIVE)){
+		int winW = RsGlobal.maximumWidth;
+		int winH = RsGlobal.maximumHeight;
+		int areaX = 0, areaY = 0, areaW = 0, areaH = 0;
+		GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+#if GLFW_VERSION_MAJOR > 3 || GLFW_VERSION_MAJOR == 3 && GLFW_VERSION_MINOR >= 3
+		if(monitor)
+			glfwGetMonitorWorkarea(monitor, &areaX, &areaY, &areaW, &areaH);
+#endif
+		if((areaW <= 0 || areaH <= 0) && monitor){
+			const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+			areaW = mode->width;
+			areaH = mode->height;
+		}
+		// keep the window on the screen, the frame buffer still gets all of its pixels
+		if(areaW > 0 && areaH > 0 && (winW > areaW || winH > areaH)){
+			float scale = Min((float)areaW / winW, (float)areaH / winH);
+			winW = Max((int)(winW * scale), 1);
+			winH = Max((int)(winH * scale), 1);
+		}
+		glfwSetWindowSize(PSGLOBAL(window), winW, winH);
+		if(areaW > 0 && areaH > 0)
+			glfwSetWindowPos(PSGLOBAL(window), areaX + (areaW - winW) / 2, areaY + (areaH - winH) / 2);
+	}
+
+	// The frame buffer size callback can come too late (or not at all when the size didn't change),
+	// so take the real frame buffer size now. It differs from the window size on HiDPI screens.
+	int fbW, fbH;
+	glfwGetFramebufferSize(PSGLOBAL(window), &fbW, &fbH);
+	if(fbW > 0 && fbH > 0 && (fbW != RsGlobal.maximumWidth || fbH != RsGlobal.maximumHeight)){
+		RwRect r;
+		RsGlobal.maximumWidth = fbW;
+		RsGlobal.maximumHeight = fbH;
+		r.x = 0;
+		r.y = 0;
+		r.w = fbW;
+		r.h = fbH;
+		RsEventHandler(rsCAMERASIZE, &r);
+	}
+#else
 	if(!(vm.flags & rwVIDEOMODEEXCLUSIVE))
 		glfwSetWindowSize(PSGLOBAL(window), RsGlobal.maximumWidth, RsGlobal.maximumHeight);
+#endif
 
 	// Make sure all keys are released
 	CPad::GetPad(0)->Clear(true);
@@ -1812,8 +1857,16 @@ cursorCB(GLFWwindow* window, double xpos, double ypos) {
 	
 	int winw, winh;
 	glfwGetWindowSize(PSGLOBAL(window), &winw, &winh);
+#ifdef FIX_BUGS
+	// integer division broke the cursor when the frame buffer isn't a whole multiple of the window (HiDPI)
+	if (winw <= 0 || winh <= 0)
+		return;
+	FrontEndMenuManager.m_nMouseTempPosX = xpos * ((float)RsGlobal.maximumWidth / winw);
+	FrontEndMenuManager.m_nMouseTempPosY = ypos * ((float)RsGlobal.maximumHeight / winh);
+#else
 	FrontEndMenuManager.m_nMouseTempPosX = xpos * (RsGlobal.maximumWidth / winw);
 	FrontEndMenuManager.m_nMouseTempPosY = ypos * (RsGlobal.maximumHeight / winh);
+#endif
 }
 
 void
@@ -1857,12 +1910,77 @@ WinMain(HINSTANCE instance,
 #endif
 
 #else
+#if defined(FIX_BUGS) && !defined(_WIN32) && !defined(__SWITCH__)
+#include <unistd.h>
+#include <limits.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
+// All game files are opened relative to the working directory. Launching the executable from a file
+// manager (e.g. double click in Finder) starts it in the home directory, so nothing is found and the
+// game crashes. If the game data isn't in the working directory but next to the executable, go there.
+static void
+ChangeToGameDirectory(void)
+{
+	if(access("models", F_OK) == 0 || access("MODELS", F_OK) == 0)
+		return;
+
+	char exePath[PATH_MAX];
+#ifdef __APPLE__
+	uint32_t size = sizeof(exePath);
+	if(_NSGetExecutablePath(exePath, &size) != 0)
+		return;
+#else
+	ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+	if(len <= 0)
+		return;
+	exePath[len] = '\0';
+#endif
+	char dir[PATH_MAX];
+	if(realpath(exePath, dir) == nil)
+		return;
+	char *slash = strrchr(dir, '/');
+	if(slash == nil)
+		return;
+	*slash = '\0';
+
+	// the executable's folder, or the folder a macOS app bundle is in (X.app/Contents/MacOS/X)
+	for(int level = 0; level < 4; level++){
+		char models[PATH_MAX + 16];
+		snprintf(models, sizeof(models), "%s/models", dir);
+		bool found = access(models, F_OK) == 0;
+		if(!found){
+			snprintf(models, sizeof(models), "%s/MODELS", dir);
+			found = access(models, F_OK) == 0;
+		}
+		if(found){
+			if(chdir(dir) == 0)
+				printf("Changed working directory to the game directory %s\n", dir);
+			return;
+		}
+		slash = strrchr(dir, '/');
+		if(slash == nil || slash == dir)
+			return;
+		*slash = '\0';
+	}
+}
+
+#endif
+
 int
 main(int argc, char *argv[])
 {
 #endif
 	RwV2d pos;
 	RwInt32 i;
+
+#if defined(FIX_BUGS) && !defined(_WIN32) && !defined(__SWITCH__)
+	ChangeToGameDirectory();
+#endif
+#ifdef FIX_BUGS
+	CheckGameData();
+#endif
 
 #ifdef USE_CUSTOM_ALLOCATOR
 	InitMemoryMgr();

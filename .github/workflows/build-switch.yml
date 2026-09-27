@@ -1,9 +1,8 @@
 name: re3 cmake devkitA64 (Nintendo Switch)
+# Upstream workflow, broken on this fork (toolchains/services it needs are gone).
+# The builds are made by release.yml, run this one by hand if needed.
 on:
-  pull_request:
-  push:
-  release:
-    types: published
+  workflow_dispatch:
 jobs:
   build-nintendo-switch:
     runs-on: ubuntu-latest

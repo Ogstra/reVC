@@ -1,3 +1,4 @@
+#define WITHWINDOWS
 #include "common.h"
 #include "crossplatform.h"
 
@@ -421,5 +422,49 @@ ssize_t readlink (const char * __path, char * __buf, size_t __buflen)
 {
    errno = ENOSYS;
    return -1;
+}
+#endif
+
+#ifdef FIX_BUGS
+void CheckGameData(void)
+{
+	static const char *files[] = { "models/gta3.img", "models/gta3.dir", "models/coll/peds.col", "data/default.dat" };
+	char msg[1024];
+	int len = snprintf(msg, sizeof(msg), "Game data not found in the game folder. Missing files:\n\n");
+	bool missing = false;
+	for(int i = 0; i < ARRAY_SIZE(files); i++){
+		FILE *f = fcaseopen(files[i], "rb");
+		if(f)
+			fclose(f);
+		else{
+			missing = true;
+			if(len >= 0 && len < (int)sizeof(msg))
+				len += snprintf(msg + len, sizeof(msg) - len, "  %s\n", files[i]);
+		}
+	}
+	if(!missing)
+		return;
+	if(len >= 0 && len < (int)sizeof(msg))
+		snprintf(msg + len, sizeof(msg) - len, "\nCopy a complete PC installation of the game into this folder and run the game from there.\n");
+#ifdef _WIN32
+	MessageBoxA(nil, msg, "Game data not found", MB_OK | MB_ICONERROR);
+#else
+	printf("ERROR: %s", msg);
+	fflush(stdout);
+#ifdef __APPLE__
+	// started from Finder there's no terminal to show the message, use a dialog
+	char script[2048];
+	int n = snprintf(script, sizeof(script), "osascript -e 'display alert \"Game data not found\" message \"");
+	for(const char *c = msg; *c && n < (int)sizeof(script) - 64; c++){
+		if(*c == '\n'){ script[n++] = '\\'; script[n++] = 'n'; }
+		else if(*c == '"' || *c == '\\'){ script[n++] = '\\'; script[n++] = *c; }
+		else if(*c != '\'') script[n++] = *c;
+	}
+	snprintf(script + n, sizeof(script) - n, "\" as critical' >/dev/null 2>&1");
+	system(script);
+#endif
+#endif
+	// global destructors can't run before the game is initialised
+	_Exit(1);
 }
 #endif

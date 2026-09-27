@@ -1,0 +1,30 @@
+Third party software in these builds
+====================================
+
+The release packages contain no files of the original game. Copy the
+executable and the files next to it into your own installation of the game.
+
+The following libraries are part of the packages. Their license texts are in
+this folder.
+
+librw (MIT license, licenses/librw.txt)
+    Linked into the executable on every platform.
+    Source: https://github.com/aap/librw
+
+OpenAL Soft (GNU LGPL, licenses/openal-soft.txt)
+    Shipped as a separate library: OpenAL32.dll on Windows, libopenal.*.dylib
+    on macOS. You may replace it with your own build of OpenAL Soft.
+    Source: https://github.com/kcat/openal-soft
+
+mpg123 (GNU LGPL 2.1, licenses/mpg123.txt)
+    Shipped as a separate library: libmpg123-0.dll on Windows,
+    libmpg123.*.dylib on macOS. You may replace it with your own build.
+    Source: https://www.mpg123.de/
+
+GLFW (zlib license, licenses/glfw.txt)
+    Used by the OpenGL builds: linked into the Windows executable, shipped as
+    libglfw.*.dylib on macOS.
+    Source: https://www.glfw.org/
+
+The Linux builds use the OpenAL Soft, mpg123 and GLFW libraries installed on
+your system.
