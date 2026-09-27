@@ -1045,7 +1045,11 @@ CAutomobile::ProcessControl(void)
 							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f;
 					}
 				}else{
+#ifdef FIX_HIGH_FPS_BUGS
+					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= 0.95f;
+#endif
 				}
 				m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT];
 			}
@@ -1059,7 +1063,11 @@ CAutomobile::ProcessControl(void)
 							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f;
 					}
 				}else{
+#ifdef FIX_HIGH_FPS_BUGS
+					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= 0.95f;
+#endif
 				}
 				m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT];
 			}
@@ -1208,7 +1216,11 @@ CAutomobile::ProcessControl(void)
 							m_aWheelSpeed[CARWHEEL_REAR_LEFT] += 0.1f;
 					}
 				}else{
+#ifdef FIX_HIGH_FPS_BUGS
+					m_aWheelSpeed[CARWHEEL_REAR_LEFT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 					m_aWheelSpeed[CARWHEEL_REAR_LEFT] *= 0.95f;
+#endif
 				}
 				m_aWheelRotation[CARWHEEL_REAR_LEFT] += m_aWheelSpeed[CARWHEEL_REAR_LEFT];
 			}
@@ -1224,7 +1236,11 @@ CAutomobile::ProcessControl(void)
 							m_aWheelSpeed[CARWHEEL_REAR_RIGHT] += 0.1f;
 					}
 				}else{
+#ifdef FIX_HIGH_FPS_BUGS
+					m_aWheelSpeed[CARWHEEL_REAR_RIGHT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 					m_aWheelSpeed[CARWHEEL_REAR_RIGHT] *= 0.95f;
+#endif
 				}
 				m_aWheelRotation[CARWHEEL_REAR_RIGHT] += m_aWheelSpeed[CARWHEEL_REAR_RIGHT];
 			}
@@ -1339,7 +1355,11 @@ CAutomobile::ProcessControl(void)
 							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f;
 					}
 				}else{
+#ifdef FIX_HIGH_FPS_BUGS
+					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= 0.95f;
+#endif
 				}
 				m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT];
 			}
@@ -1353,7 +1373,11 @@ CAutomobile::ProcessControl(void)
 							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f;
 					}
 				}else{
+#ifdef FIX_HIGH_FPS_BUGS
+					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= 0.95f;
+#endif
 				}
 				m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT];
 			}
@@ -3548,11 +3572,20 @@ CAutomobile::HydraulicControl(void)
 			m_hydraulicState = 20;
 			DMAudio.PlayOneShot(m_audioEntityId, SOUND_CAR_HYDRAULIC_1, 0.0f);
 			setPrevRatio = true;
-		}else{
+		}else
+#ifdef FIX_HIGH_FPS_BUGS
+		// the state counts 30 fps frames
+		if(CTimer::GetSimFramesPassed() != 0)
+#endif
+		{
 			m_hydraulicState++;
 		}
 	}else if(m_hydraulicState != 0){	// must always be true
-		if(m_hydraulicState < 21 && m_fVelocityChangeForAudio < 0.1f){
+		if(m_hydraulicState < 21 && m_fVelocityChangeForAudio < 0.1f
+#ifdef FIX_HIGH_FPS_BUGS
+		   && CTimer::GetSimFramesPassed() != 0
+#endif
+		   ){
 			m_hydraulicState--;
 			if(m_hydraulicState == 0)
 				DMAudio.PlayOneShot(m_audioEntityId, SOUND_CAR_HYDRAULIC_2, 0.0f);
@@ -3671,7 +3704,11 @@ CAutomobile::HydraulicControl(void)
 				}
 			}
 		}else{
-			if(m_hydraulicState < 104)
+			if(m_hydraulicState < 104
+#ifdef FIX_HIGH_FPS_BUGS
+			   && CTimer::GetSimFramesPassed() != 0
+#endif
+			   )
 				m_hydraulicState++;
 
 			if(m_fVelocityChangeForAudio < 0.1f){

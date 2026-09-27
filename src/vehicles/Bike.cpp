@@ -873,7 +873,11 @@ CBike::ProcessControl(void)
 					WheelState[BIKEWHEEL_FRONT] = WHEEL_STATE_NORMAL;
 			}else{
 				// Wheel in the air
+#ifdef FIX_HIGH_FPS_BUGS
+				m_aWheelSpeed[BIKEWHEEL_FRONT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 				m_aWheelSpeed[BIKEWHEEL_FRONT] *= 0.95f;
+#endif
 				m_aWheelRotation[BIKEWHEEL_FRONT] += m_aWheelSpeed[BIKEWHEEL_FRONT];
 			}
 		}
@@ -1017,7 +1021,11 @@ CBike::ProcessControl(void)
 					WheelState[BIKEWHEEL_FRONT] = WHEEL_STATE_NORMAL;
 			}else{
 				// Wheel in the air
+#ifdef FIX_HIGH_FPS_BUGS
+				m_aWheelSpeed[BIKEWHEEL_FRONT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 				m_aWheelSpeed[BIKEWHEEL_FRONT] *= 0.95f;
+#endif
 				m_aWheelRotation[BIKEWHEEL_FRONT] += m_aWheelSpeed[BIKEWHEEL_FRONT];
 			}
 		}

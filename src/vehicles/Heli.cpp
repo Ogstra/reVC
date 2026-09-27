@@ -283,7 +283,12 @@ CHeli::ProcessControl(void)
 		if(fTargetDist > targetHeight)
 			m_heliStatus = HELI_STATUS_CHASE_PLAYER;
 		}
+#ifdef FIX_HIGH_FPS_BUGS
+		// it has a 1 in 128 chance to send them down each time, which was made for 30 fps
+		if(m_numSwat && CTimer::GetSimFramesPassed() != 0)
+#else
 		if(m_numSwat)
+#endif
 			SendDownSwat();
 		break;
 	case HELI_STATUS_CHASE_PLAYER:{
