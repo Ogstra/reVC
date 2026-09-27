@@ -56,9 +56,79 @@ fontGetStringSize(const char *s)
 	return sz;
 }
 
+#ifdef FIX_BUGS
+// RtCharset can only draw the font at its native size, which is unreadable on high resolution screens.
+// Draw the glyphs ourselves, scaled by fontscale.
+#define NUMSCALEDCHARS 100
+static RwIm2DVertex scaledCharVerts[NUMSCALEDCHARS*4];
+static RwImVertexIndex scaledCharIndices[NUMSCALEDCHARS*6];
+static int numScaledChars;
+static RwRaster *scaledCharRaster;
+
+static void
+fontFlushScaled(void)
+{
+	if(numScaledChars){
+		RwRenderStateSet(rwRENDERSTATETEXTURERASTER, scaledCharRaster);
+		RwRenderStateSet(rwRENDERSTATETEXTUREFILTER, (void*)rwFILTERNEAREST);
+		RwIm2DRenderIndexedPrimitive(rwPRIMTYPETRILIST, scaledCharVerts, numScaledChars*4, scaledCharIndices, numScaledChars*6);
+	}
+	numScaledChars = 0;
+	scaledCharRaster = nil;
+}
+
+static void
+fontPrintCharScaled(RtCharset *charset, int c, float x, float y)
+{
+	if(c >= charset->desc.count)
+		return;
+	if(charset->raster != scaledCharRaster || numScaledChars >= NUMSCALEDCHARS)
+		fontFlushScaled();
+	scaledCharRaster = charset->raster;
+
+	RwCamera *cam = RwCameraGetCurrentCamera();
+	float nearz = RwCameraGetNearClipPlane(cam);
+	float recipz = 1.0f/nearz;
+	float rasterW = RwRasterGetWidth(charset->raster);
+	float rasterH = RwRasterGetHeight(charset->raster);
+	float u = ((c % charset->desc.tileWidth)*charset->desc.width_internal + HALFPX) / rasterW;
+	float v = ((c / charset->desc.tileWidth)*charset->desc.height_internal + HALFPX) / rasterH;
+	float du = charset->desc.width_internal / rasterW;
+	float dv = charset->desc.height_internal / rasterH;
+	float w = charset->desc.width_internal*fontscale;
+	float h = charset->desc.height_internal*fontscale;
+
+	RwIm2DVertex *vert = &scaledCharVerts[numScaledChars*4];
+	for(int i = 0; i < 4; i++){
+		RwIm2DVertexSetScreenX(&vert[i], x + (i & 1 ? w : 0.0f));
+		RwIm2DVertexSetScreenY(&vert[i], y + (i & 2 ? h : 0.0f));
+		RwIm2DVertexSetScreenZ(&vert[i], RwIm2DGetNearScreenZ());
+		RwIm2DVertexSetCameraZ(&vert[i], nearz);
+		RwIm2DVertexSetRecipCameraZ(&vert[i], recipz);
+		RwIm2DVertexSetIntRGBA(&vert[i], 255, 255, 255, 255);
+		RwIm2DVertexSetU(&vert[i], u + (i & 1 ? du : 0.0f), recipz);
+		RwIm2DVertexSetV(&vert[i], v + (i & 2 ? dv : 0.0f), recipz);
+	}
+	RwImVertexIndex *ix = &scaledCharIndices[numScaledChars*6];
+	RwImVertexIndex base = numScaledChars*4;
+	ix[0] = base; ix[1] = base+1; ix[2] = base+2;
+	ix[3] = base+2; ix[4] = base+1; ix[5] = base+3;
+	numScaledChars++;
+}
+#endif
+
 Pt
 fontPrint(const char *s, float x, float y, int style)
 {
+#ifdef FIX_BUGS
+	if(fontscale > 1){
+		for(const char *c = s; *c; c++){
+			fontPrintCharScaled(fontStyles[style], (uint8)*c, x, y);
+			x += fontDesc.width*fontscale;
+		}
+		return fontGetStringSize(s);
+	}
+#endif
 	RtCharsetPrintBuffered(fontStyles[style], s, x, y, false);
 	return fontGetStringSize(s);
 }
@@ -1046,10 +1116,15 @@ DebugMenuRender(void)
 	screenWidth = RwRasterGetWidth(RwCameraGetRaster(cam));
 	screenHeight = RwRasterGetHeight(RwCameraGetRaster(cam));
 
+#ifdef FIX_BUGS
+	// 1 up to 1080p, 2 for 1440p-ish Retina/4K, 3 for 6K
+	fontscale = Max(1, (screenHeight + 540) / 1080);
+#else
 //	if(screenHeight > 1080)
 //		fontscale = 2;
 //	else
 		fontscale = 1;
+#endif
 
 	Pt sz;
 	sz = fontPrint("Debug Menu", firstBorder*fontscale+30, topBorder, 0);
@@ -1062,6 +1137,9 @@ DebugMenuRender(void)
 	toplevel.draw();
 	processInput();
 	RtCharsetBufferFlush();
+#ifdef FIX_BUGS
+	fontFlushScaled();
+#endif
 
 	drawMouse();
 }
