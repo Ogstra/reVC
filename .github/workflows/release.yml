@@ -152,7 +152,7 @@ jobs:
           cmake --build build-glfw --target install
           curl -sSfL https://github.com/kcat/openal-soft/archive/refs/tags/$OPENAL_VERSION.tar.gz | tar xz
           cmake -S openal-soft-$OPENAL_VERSION -B build-openal -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$DEPS \
-            -DALSOFT_EXAMPLES=OFF -DALSOFT_UTILS=OFF -DALSOFT_TESTS=OFF
+            -DALSOFT_EXAMPLES=OFF -DALSOFT_UTILS=OFF -DALSOFT_TESTS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
           cmake --build build-openal --target install
           curl -sSfL -o mpg123.tar.bz2 https://downloads.sourceforge.net/project/mpg123/mpg123/$MPG123_VERSION/mpg123-$MPG123_VERSION.tar.bz2 ||
             curl -sSfL -o mpg123.tar.bz2 https://www.mpg123.de/download/mpg123-$MPG123_VERSION.tar.bz2
