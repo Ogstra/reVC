@@ -137,7 +137,11 @@ CCam::Process(void)
 			TargetSpeedVar = Min(Sqrt(SQR(FwdSpeedX) + SQR(FwdSpeedY))/0.9f, 1.0f);
 		else
 			TargetSpeedVar = -Min(Sqrt(SQR(FwdSpeedX) + SQR(FwdSpeedY))/1.8f, 0.5f);
+#ifdef FIX_HIGH_FPS_BUGS
+		SpeedVar += (TargetSpeedVar - SpeedVar) * CTimer::ScaleFrameLerp(0.105f);
+#else
 		SpeedVar = 0.895f*SpeedVar + 0.105*TargetSpeedVar;
+#endif
 	}else{
 		if(CamTargetEntity == FindPlayerPed()){
 			// Some fancy smoothing of player position and speed
@@ -2121,9 +2125,18 @@ CCam::Process_TopDownPed(const CVector &CameraTarget, float TargetOrientation, f
 	RwCameraSetNearClipPlane(Scene.camera, NearClipDistance);
 
 	// Average ped speed
+#ifdef FIX_HIGH_FPS_BUGS
+	// sample once per 30 fps frame, so the average covers the same time at any frame rate
+	if(CTimer::GetSimFramesPassed() != 0){
+		NumPedPosCountsSoFar++;
+		PedSpeedSoFar += PlayerMoveSpeed.Magnitude();
+	}
+	if(NumPedPosCountsSoFar >= 5){
+#else
 	NumPedPosCountsSoFar++;
 	PedSpeedSoFar += PlayerMoveSpeed.Magnitude();
 	if(NumPedPosCountsSoFar == 5){
+#endif
 		PedAverageSpeed = 0.4f*PedAverageSpeed + 0.6*(PedSpeedSoFar/5.0f);
 		NumPedPosCountsSoFar = 0;
 		PedSpeedSoFar = 0.0f;
@@ -2656,17 +2669,22 @@ CCam::Process_1stPerson(const CVector &CameraTarget, float TargetOrientation, fl
 			Source.z = Neck.z + fBike1stPersonOffsetZ;
 		}
 
+#ifdef FIX_HIGH_FPS_BUGS
+		float fixerStep = 0.03f * CTimer::GetTimeStepFix();
+#else
+		float fixerStep = 0.03f;
+#endif
 		if(((CVehicle*)CamTargetEntity)->IsUpsideDown()){
 			if(DontLookThroughWorldFixer < 0.5f)
-				DontLookThroughWorldFixer += 0.03f;
+				DontLookThroughWorldFixer += fixerStep;
 			else
 				DontLookThroughWorldFixer = 0.5f;
 		}else{
 			if(DontLookThroughWorldFixer < 0.0f)
 #ifdef FIX_BUGS
-				DontLookThroughWorldFixer += 0.03f;
+				DontLookThroughWorldFixer += fixerStep;
 #else
-				DontLookThroughWorldFixer -= 0.03f;
+				DontLookThroughWorldFixer -= fixerStep;
 #endif
 			else
 				DontLookThroughWorldFixer = 0.0f;
