@@ -182,3 +182,8 @@ void GetDateFormat(int, int, SYSTEMTIME*, int, char*, int);
 #define GLFW_GAMEPAD_BUTTON_Y 2
 
 #endif
+
+#ifdef FIX_BUGS
+// Without the game data the game crashes somewhere during start up. Say which files are missing and quit instead.
+void CheckGameData(void);
+#endif
