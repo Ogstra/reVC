@@ -1985,15 +1985,25 @@ ChangeToGameDirectory(void)
 		return;
 	*slash = '\0';
 
-	char models[PATH_MAX + 16];
-	snprintf(models, sizeof(models), "%s/models", dir);
-	if(access(models, F_OK) != 0){
-		snprintf(models, sizeof(models), "%s/MODELS", dir);
-		if(access(models, F_OK) != 0)
+	// the executable's folder, or the folder a macOS app bundle is in (X.app/Contents/MacOS/X)
+	for(int level = 0; level < 4; level++){
+		char models[PATH_MAX + 16];
+		snprintf(models, sizeof(models), "%s/models", dir);
+		bool found = access(models, F_OK) == 0;
+		if(!found){
+			snprintf(models, sizeof(models), "%s/MODELS", dir);
+			found = access(models, F_OK) == 0;
+		}
+		if(found){
+			if(chdir(dir) == 0)
+				printf("Changed working directory to the game directory %s\n", dir);
 			return;
+		}
+		slash = strrchr(dir, '/');
+		if(slash == nil || slash == dir)
+			return;
+		*slash = '\0';
 	}
-	if(chdir(dir) == 0)
-		printf("Changed working directory to the game directory %s\n", dir);
 }
 
 #endif
