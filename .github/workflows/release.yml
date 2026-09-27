@@ -1,11 +1,12 @@
 name: Release
 
-# Builds the game for every supported platform and publishes a GitHub release
+# Builds the game for every supported platform (also for pull requests) and publishes a GitHub release
 # when a tag starting with "v" is pushed, e.g. git tag v1.1-re3 && git push origin v1.1-re3
 on:
   push:
     tags:
       - 'v*'
+  pull_request:
   workflow_dispatch:
 
 env:
