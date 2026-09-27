@@ -138,7 +138,7 @@ int8 CMenuManager::m_nDisplayMSAALevel = 0;
 #endif
 
 #ifdef NO_ISLAND_LOADING
-int8 CMenuManager::m_PrefsIslandLoading = ISLAND_LOADING_LOW;
+int8 CMenuManager::m_PrefsIslandLoading = ISLAND_LOADING_HIGH;	// no loading screens between islands by default
 #endif
 
 #ifdef GAMEPAD_MENU
@@ -154,7 +154,7 @@ int8 CMenuManager::m_PrefsUseVibration;
 int8 CMenuManager::m_DisplayControllerOnFoot;
 int8 CMenuManager::m_PrefsVsync = 1;
 int8 CMenuManager::m_PrefsVsyncDisp = 1;
-int8 CMenuManager::m_PrefsFrameLimiter = 1;
+int8 CMenuManager::m_PrefsFrameLimiter = 0;	// the game logic is frame rate independent now, don't cap it by default
 int8 CMenuManager::m_PrefsShowSubtitles = 1;
 int8 CMenuManager::m_PrefsSpeakers;
 int32 CMenuManager::m_ControlMethod;
@@ -5096,12 +5096,12 @@ CMenuManager::ProcessButtonPresses(void)
 						DMAudio.PlayFrontEndTrack(m_PrefsRadioStation, TRUE);
 						SaveSettings();
 					} else if (m_nCurrScreen == MENUPAGE_DISPLAY_SETTINGS) {
-						m_PrefsFrameLimiter = true;
+						m_PrefsFrameLimiter = false;
 						m_PrefsBrightness = 256;
 						m_PrefsVsyncDisp = true;
-						m_PrefsLOD = 1.2f;
+						m_PrefsLOD = 1.8f;
 						m_PrefsVsync = true;
-						CRenderer::ms_lodDistScale = 1.2f;
+						CRenderer::ms_lodDistScale = 1.8f;
 #ifdef ASPECT_RATIO_SCALE
 						m_PrefsUseWideScreen = AR_AUTO;
 #else
@@ -5149,11 +5149,11 @@ CMenuManager::ProcessButtonPresses(void)
 						m_ControlMethod = CONTROL_STANDARD;
 #ifdef FIX_BUGS
 						MousePointerStateHelper.bInvertVertically = true;
-						TheCamera.m_fMouseAccelVertical = 0.003f;
+						TheCamera.m_fMouseAccelVertical = 0.00175f;
 #else
 						MousePointerStateHelper.bInvertVertically = false;
 #endif
-						TheCamera.m_fMouseAccelHorzntl = 0.0025f;
+						TheCamera.m_fMouseAccelHorzntl = 0.00125f;
 						CVehicle::m_bDisableMouseSteering = true;
 						TheCamera.m_bHeadBob = false;
 						SaveSettings();

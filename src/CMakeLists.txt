@@ -53,7 +53,29 @@ target_compile_definitions(${EXECUTABLE} PRIVATE CMAKE_BUILD)
 target_compile_definitions(${EXECUTABLE} PRIVATE USE_OUR_VERSIONING)
 
 if(${PROJECT}_AUDIO STREQUAL "OAL")
-    find_package(OpenAL REQUIRED)
+    if(APPLE)
+        # Apple's OpenAL framework is deprecated and has neither EFX nor AL_SOFT_loop_points, which the
+        # audio code relies on. Use OpenAL Soft from Homebrew (brew install openal-soft) instead.
+        find_program(BREW_EXECUTABLE brew)
+        if(BREW_EXECUTABLE)
+            execute_process(COMMAND "${BREW_EXECUTABLE}" --prefix openal-soft
+                OUTPUT_VARIABLE OPENAL_SOFT_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+        endif()
+        list(APPEND CMAKE_PREFIX_PATH ${OPENAL_SOFT_PREFIX} /opt/homebrew/opt/openal-soft /usr/local/opt/openal-soft)
+        set(SAVED_CMAKE_FIND_FRAMEWORK ${CMAKE_FIND_FRAMEWORK})
+        set(CMAKE_FIND_FRAMEWORK LAST)
+        find_package(OpenAL REQUIRED)
+        set(CMAKE_FIND_FRAMEWORK ${SAVED_CMAKE_FIND_FRAMEWORK})
+        if(OPENAL_LIBRARY MATCHES "\\.framework")
+            message(FATAL_ERROR "Found Apple's OpenAL framework (${OPENAL_LIBRARY}), but ${EXECUTABLE} needs OpenAL Soft. "
+                "Install it with 'brew install openal-soft' or point OPENAL_LIBRARY/OPENAL_INCLUDE_DIR to it.")
+        endif()
+        # FindOpenAL returns the include/AL directory, the sources include <AL/al.h>
+        get_filename_component(OPENAL_INCLUDE_PARENT_DIR "${OPENAL_INCLUDE_DIR}" DIRECTORY)
+        target_include_directories(${EXECUTABLE} PRIVATE "${OPENAL_INCLUDE_PARENT_DIR}")
+    else()
+        find_package(OpenAL REQUIRED)
+    endif()
     if(TARGET OpenAL::OpenAL)
         target_link_libraries(${EXECUTABLE} PRIVATE OpenAL::OpenAL)
     else()

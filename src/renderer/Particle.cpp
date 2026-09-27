@@ -800,6 +800,15 @@ void CParticle::Shutdown()
 	debug("CParticle shut down");
 }
 
+#ifdef FIX_HIGH_FPS_BUGS
+int32 CContinuousParticleEmitter::ms_nActive;
+
+bool CContinuousParticleEmitter::IsEmissionFrame(void)
+{
+	return ms_nActive <= 0 || CTimer::GetSimFramesPassed() != 0;
+}
+#endif
+
 CParticle *CParticle::AddParticle(tParticleType type, CVector const &vecPos, CVector const &vecDir, CEntity *pEntity, float fSize, int32 nRotationSpeed, int32 nRotation, int32 nCurFrame, int32 nLifeSpan)
 {
 	CRGBA color(0, 0, 0, 0);
@@ -810,6 +819,11 @@ CParticle *CParticle::AddParticle(tParticleType type, CVector const &vecPos, CVe
 {
 	if ( CTimer::GetIsPaused() )
 		return NULL;
+
+#ifdef FIX_HIGH_FPS_BUGS
+	if ( !CContinuousParticleEmitter::IsEmissionFrame() )
+		return NULL;
+#endif
 
 #ifdef PC_PARTICLE
 	if ( ( type == PARTICLE_ENGINE_SMOKE

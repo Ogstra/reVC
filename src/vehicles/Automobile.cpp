@@ -458,11 +458,22 @@ CAutomobile::ProcessControl(void)
 		m_vecMoveSpeedAvg = (m_vecMoveSpeedAvg + m_vecMoveSpeed)/2.0f;
 		m_vecTurnSpeedAvg = (m_vecTurnSpeedAvg + m_vecTurnSpeed)/2.0f;
 
-		if(m_vecMoveSpeedAvg.MagnitudeSqr() <= sq(moveSpeedLimit*CTimer::GetTimeStep()) &&
-		   m_vecTurnSpeedAvg.MagnitudeSqr() <= sq(turnSpeedLimit*CTimer::GetTimeStep()) &&
+#ifdef FIX_HIGH_FPS_BUGS
+		// the limits are per frame distances, don't make them stricter above 30 fps
+		float staticStep = Max(CTimer::GetTimeStep(), CTimer::GetDefaultTimeStep());
+		distanceLimit *= Min(CTimer::GetTimeStepFix(), 1.0f);
+#else
+		float staticStep = CTimer::GetTimeStep();
+#endif
+		if(m_vecMoveSpeedAvg.MagnitudeSqr() <= sq(moveSpeedLimit*staticStep) &&
+		   m_vecTurnSpeedAvg.MagnitudeSqr() <= sq(turnSpeedLimit*staticStep) &&
 		   m_fDistanceTravelled < distanceLimit ||
 		   makeStatic){
+#ifdef FIX_HIGH_FPS_BUGS
+			m_nStaticFrames += CTimer::GetSimFramesPassed();
+#else
 			m_nStaticFrames++;
+#endif
 
 			if(m_nStaticFrames > 10 || makeStatic)
 				if(!CCarCtrl::MapCouldMoveInThisArea(GetPosition().x, GetPosition().y)){
@@ -845,7 +856,11 @@ CAutomobile::ProcessControl(void)
 						m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f;
 				}
 			}else{
+#ifdef FIX_HIGH_FPS_BUGS
+				m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 				m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= 0.95f;
+#endif
 			}
 			m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT];
 		}
@@ -859,7 +874,11 @@ CAutomobile::ProcessControl(void)
 						m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f;
 				}
 			}else{
+#ifdef FIX_HIGH_FPS_BUGS
+				m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 				m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= 0.95f;
+#endif
 			}
 			m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT];
 		}
@@ -960,7 +979,11 @@ CAutomobile::ProcessControl(void)
 						m_aWheelSpeed[CARWHEEL_REAR_LEFT] += 0.1f;
 				}
 			}else{
+#ifdef FIX_HIGH_FPS_BUGS
+				m_aWheelSpeed[CARWHEEL_REAR_LEFT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 				m_aWheelSpeed[CARWHEEL_REAR_LEFT] *= 0.95f;
+#endif
 			}
 			m_aWheelRotation[CARWHEEL_REAR_LEFT] += m_aWheelSpeed[CARWHEEL_REAR_LEFT];
 		}
@@ -974,7 +997,11 @@ CAutomobile::ProcessControl(void)
 						m_aWheelSpeed[CARWHEEL_REAR_RIGHT] += 0.1f;
 				}
 			}else{
+#ifdef FIX_HIGH_FPS_BUGS
+				m_aWheelSpeed[CARWHEEL_REAR_RIGHT] *= CTimer::ScaleFrameMultiplier(0.95f);
+#else
 				m_aWheelSpeed[CARWHEEL_REAR_RIGHT] *= 0.95f;
+#endif
 			}
 			m_aWheelRotation[CARWHEEL_REAR_RIGHT] += m_aWheelSpeed[CARWHEEL_REAR_RIGHT];
 		}
@@ -983,7 +1010,11 @@ CAutomobile::ProcessControl(void)
 			float wheelPos = colModel->lines[i].p0.z;
 			if(m_aSuspensionSpringRatio[i] > 0.0f)
 				wheelPos -= m_aSuspensionSpringRatio[i]*m_aSuspensionSpringLength[i];
+#ifdef FIX_HIGH_FPS_BUGS
+			m_aWheelPosition[i] += (wheelPos - m_aWheelPosition[i])*CTimer::ScaleFrameLerp(0.75f);
+#else
 			m_aWheelPosition[i] += (wheelPos - m_aWheelPosition[i])*0.75f;
+#endif
 		}
 		for(i = 0; i < 4; i++)
 			m_aWheelState[i] = WheelState[i];
@@ -995,7 +1026,12 @@ CAutomobile::ProcessControl(void)
 		}else{
 			if(GetModelIndex() == MI_MRWHOOP){
 				if(Pads[0].bHornHistory[Pads[0].iCurrHornHistory] &&
-				   !Pads[0].bHornHistory[(Pads[0].iCurrHornHistory+CPad::HORNHISTORY_SIZE-1) % CPad::HORNHISTORY_SIZE]){
+				   !Pads[0].bHornHistory[(Pads[0].iCurrHornHistory+CPad::HORNHISTORY_SIZE-1) % CPad::HORNHISTORY_SIZE]
+#ifdef FIX_HIGH_FPS_BUGS
+				   // the horn history only moves on once per 30 fps frame, don't toggle again until it does
+				   && CTimer::GetLogicalFramesPassed() != 0
+#endif
+				   ){
 					m_bSirenOrAlarm = !m_bSirenOrAlarm;
 					printf("m_bSirenOrAlarm toggled to %d\n", m_bSirenOrAlarm);
 				}
@@ -1007,7 +1043,12 @@ CAutomobile::ProcessControl(void)
 					else
 						m_nCarHornTimer = 0;
 				}else if(Pads[0].bHornHistory[(Pads[0].iCurrHornHistory+CPad::HORNHISTORY_SIZE-1) % CPad::HORNHISTORY_SIZE] &&
-				         !Pads[0].bHornHistory[(Pads[0].iCurrHornHistory+1) % CPad::HORNHISTORY_SIZE]){
+				         !Pads[0].bHornHistory[(Pads[0].iCurrHornHistory+1) % CPad::HORNHISTORY_SIZE]
+#ifdef FIX_HIGH_FPS_BUGS
+				         // the horn history only moves on once per 30 fps frame, don't toggle again until it does
+				         && CTimer::GetLogicalFramesPassed() != 0
+#endif
+				         ){
 					m_nCarHornTimer = 0;
 					m_bSirenOrAlarm = !m_bSirenOrAlarm;
 				}else
@@ -1024,7 +1065,11 @@ CAutomobile::ProcessControl(void)
 
 		if(GetStatus() != STATUS_PLAYER && GetStatus() != STATUS_PLAYER_REMOTE && GetStatus() != STATUS_PHYSICS){
 			if(GetModelIndex() == MI_MIAMI_RCRAIDER || GetModelIndex() == MI_MIAMI_SPARROW)
+#ifdef FIX_HIGH_FPS_BUGS
+				m_aWheelSpeed[0] = Max(m_aWheelSpeed[0]-0.0005f*CTimer::GetTimeStepFix(), 0.0f);
+#else
 				m_aWheelSpeed[0] = Max(m_aWheelSpeed[0]-0.0005f, 0.0f);
+#endif
 		}else if((GetModelIndex() == MI_DODO || CVehicle::bAllDodosCheat) &&
 		         m_vecMoveSpeed.Magnitude() > 0.0f && CTimer::GetTimeStep() > 0.0f){
 #ifdef ALT_DODO_CHEAT
@@ -1045,7 +1090,12 @@ CAutomobile::ProcessControl(void)
 				if (CPad::GetPad(0)->GetCircleJustDown())
 					m_aWheelSpeed[0] = Max(m_aWheelSpeed[0] - 0.03f, 0.0f);
 				if (m_aWheelSpeed[0] < 0.22f)
+#ifdef FIX_HIGH_FPS_BUGS
+					// rotor has to reach 0.15 before the heli can take off
+					m_aWheelSpeed[0] += 0.0001f*CTimer::GetTimeStepFix();
+#else
 					m_aWheelSpeed[0] += 0.0001f;
+#endif
 				if (m_aWheelSpeed[0] > 0.15f)
 					FlyingControl(FLIGHT_MODEL_HELI);
 			}
@@ -1087,6 +1137,7 @@ CAutomobile::ProcessControl(void)
 
 	if(m_fHealth < 250.0f && GetStatus() != STATUS_WRECKED){
 		// Car is on fire
+		CONTINUOUS_PARTICLE_EMITTER;
 
 		CParticle::AddParticle(PARTICLE_CARFLAME, damagePos,
 			CVector(0.0f, 0.0f, CGeneral::GetRandomNumberInRange(0.01125f, 0.09f)),
@@ -1111,7 +1162,11 @@ CAutomobile::ProcessControl(void)
 
 	// Decrease car health if engine is damaged badly
 	if(engineStatus > ENGINE_STATUS_ON_FIRE && m_fHealth > 250.0f)
+#ifdef FIX_HIGH_FPS_BUGS
+		m_fHealth -= 2.0f*CTimer::GetTimeStepFix();
+#else
 		m_fHealth -= 2.0f;
+#endif
 
 	ProcessDelayedExplosion();
 
@@ -1242,6 +1297,7 @@ CAutomobile::Teleport(CVector pos)
 void
 CAutomobile::PreRender(void)
 {
+	CONTINUOUS_PARTICLE_EMITTER;
 	int i, j, n;
 	CVehicleModelInfo *mi = (CVehicleModelInfo*)CModelInfo::GetModelInfo(GetModelIndex());
 
@@ -2198,7 +2254,12 @@ CAutomobile::ProcessEntityCollision(CEntity *ent, CColPoint *colpoints)
 						// damage body cast
 						float speed = m_vecMoveSpeed.MagnitudeSqr();
 						if(speed > 0.1f){
+#ifdef FIX_HIGH_FPS_BUGS
+							// done every frame while the wheel is on the body cast
+							CObject::nBodyCastHealth -= 0.1f*m_fMass*speed*CTimer::GetTimeStepFix();
+#else
 							CObject::nBodyCastHealth -= 0.1f*m_fMass*speed;
+#endif
 							DMAudio.PlayOneShot(m_audioEntityId, SOUND_PED_BODYCAST_HIT, 0.0f);
 						}
 
@@ -2666,11 +2727,20 @@ CAutomobile::HydraulicControl(void)
 				m_aWheelPosition[i] -= 0.06f;
 			DMAudio.PlayOneShot(m_audioEntityId, SOUND_CAR_HYDRAULIC_1, 0.0f);
 			setPrevRatio = true;
-		}else{
+		}else
+#ifdef FIX_HIGH_FPS_BUGS
+		// the state counts 30 fps frames
+		if(CTimer::GetSimFramesPassed() != 0)
+#endif
+		{
 			m_hydraulicState++;
 		}
 	}else if(m_hydraulicState != 0){	// must always be true
-		if(m_hydraulicState < 21 && m_fVelocityChangeForAudio < 0.1f){
+		if(m_hydraulicState < 21 && m_fVelocityChangeForAudio < 0.1f
+#ifdef FIX_HIGH_FPS_BUGS
+		   && CTimer::GetSimFramesPassed() != 0
+#endif
+		   ){
 			m_hydraulicState--;
 			if(m_hydraulicState == 0)
 				DMAudio.PlayOneShot(m_audioEntityId, SOUND_CAR_HYDRAULIC_2, 0.0f);
@@ -4268,10 +4338,16 @@ CPed::MakeTyresMuddySectorList(CPtrList &list)
 										((CAutomobile*)veh)->m_aWheelSkidmarkBloody[wheel] = true;
 										DMAudio.PlayOneShot(veh->m_audioEntityId, SOUND_SPLATTER, 0.0f);
 									}
-									veh->ApplyMoveForce(CVector(0.0f, 0.0f, 50.0f));
+#ifdef FIX_HIGH_FPS_BUGS
+									// applied every frame while the wheel is under the tank
+									float step = CTimer::GetTimeStepFix();
+#else
+									float step = 1.0f;
+#endif
+									veh->ApplyMoveForce(CVector(0.0f, 0.0f, 50.0f * step));
 									
 									CVector vehAndWheelDist = wheelPos - veh->GetPosition();
-									veh->ApplyTurnForce(CVector(0.0f, 0.0f, 50.0f), vehAndWheelDist);
+									veh->ApplyTurnForce(CVector(0.0f, 0.0f, 50.0f * step), vehAndWheelDist);
 
 									if (veh == FindPlayerVehicle()) {
 										CPad::GetPad(0)->StartShake(300, 70);
