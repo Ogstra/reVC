@@ -1016,6 +1016,12 @@ void _InputInitialiseJoys()
 long _InputInitialiseMouse()
 {
 	glfwSetInputMode(PSGLOBAL(window), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+#if defined(FIX_BUGS) && GLFW_VERSION_MAJOR == 3 && GLFW_VERSION_MINOR >= 3
+	// Read the mouse movement without the OS pointer acceleration, like DirectInput does in the D3D9 build.
+	// The accelerated pointer made the camera feel floaty. GLFW uses it whenever the cursor is disabled (in game).
+	if(glfwRawMouseMotionSupported())
+		glfwSetInputMode(PSGLOBAL(window), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+#endif
 	return 0;
 }
 

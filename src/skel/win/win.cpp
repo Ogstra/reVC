@@ -244,6 +244,38 @@ psCameraShowRaster(RwCamera *camera)
 }
 
 
+#if defined(FIX_BUGS) && defined(LIBRW) && defined(RW_D3D9)
+// Direct3D 9 lets the CPU run up to three frames ahead of the GPU, so without the frame limiter
+// the mouse was read up to three frames before its result was shown, which felt laggy.
+// Mark the end of each frame and wait for it before reading the input of the next one.
+static IDirect3DQuery9 *pFrameEndQuery;
+
+void
+psFrameSubmitted(void)
+{
+	if (rw::d3d::d3ddevice == nil)
+		return;
+	if (pFrameEndQuery == nil && FAILED(rw::d3d::d3ddevice->CreateQuery(D3DQUERYTYPE_EVENT, &pFrameEndQuery))) {
+		pFrameEndQuery = nil;
+		return;
+	}
+	pFrameEndQuery->Issue(D3DISSUE_END);
+}
+
+void
+psWaitForPreviousFrame(void)
+{
+	if (pFrameEndQuery == nil)
+		return;
+	// S_FALSE means not done yet, anything else (done, device lost) ends the wait
+	while (pFrameEndQuery->GetData(nil, 0, D3DGETDATA_FLUSH) == S_FALSE)
+		Sleep(0);
+	// released right away, a query can't be alive while the device is reset
+	pFrameEndQuery->Release();
+	pFrameEndQuery = nil;
+}
+#endif
+
 /*
  *****************************************************************************
  */
@@ -300,6 +332,10 @@ psMouseSetPos(RwV2d *pos)
 
 	ClientToScreen(PSGLOBAL(window), &point);
 
+#ifdef FIX_BUGS
+	// the game centres the cursor every frame, which kept it locked in the window after alt-tabbing out
+	if (GetForegroundWindow() == PSGLOBAL(window))
+#endif
 	SetCursorPos(point.x, point.y);
 	
 	PSGLOBAL(lastMousePos.x) = (RwInt32)pos->x;
