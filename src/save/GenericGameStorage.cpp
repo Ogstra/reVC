@@ -426,6 +426,9 @@ DoGameSpecificStuffAfterSucessLoad()
 {
 	StillToFadeOut = true;
 	JustLoadedDontFadeInYet = true;
+#ifdef FIX_HIGH_FPS_BUGS
+	CTheScripts::bForceScriptTick = true;
+#endif
 	CTheScripts::Process();
 }
 
