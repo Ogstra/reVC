@@ -11,64 +11,57 @@ on:
 env:
   GAME: reVC
   GLFW_VERSION: "3.3.8"
+  OPENAL_VERSION: "1.23.1"
+  MPG123_VERSION: "1.32.10"
 
 permissions:
   contents: write
 
 jobs:
-  linux-x64:
+  linux:
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            image: debian:bullseye
+            shell: ""
+          - arch: x86
+            # Ubuntu no longer ships 32 bit development libraries (GLFW etc.), Debian still has a complete i386 port
+            image: i386/debian:bullseye
+            shell: linux32
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Install dependencies
+      # Debian 11 has glibc 2.31, so the binaries also run on older distributions
+      - name: Build in Debian 11
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build libglfw3-dev libopenal-dev libmpg123-dev libsndfile1-dev
-      - name: Build
-        run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
-          cmake --build build
-      - name: Package
-        run: |
-          mkdir -p package
-          cp -r gamefiles/. package/
-          cp build/src/${GAME} package/
-          tar -czf ${GAME}-linux-x64.tar.gz -C package .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-x64
-          path: ${{ env.GAME }}-linux-x64.tar.gz
-
-  linux-x86:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      # Ubuntu no longer ships 32 bit development libraries (GLFW etc.), Debian still has a complete i386 port
-      - name: Build in 32 bit Debian
-        run: |
-          docker run --rm -v "$PWD:/src" -w /src i386/debian:bookworm linux32 bash -c "
+          docker run --rm -v "$PWD:/src" -w /src ${{ matrix.image }} ${{ matrix.shell }} bash -c "
             set -e
-            apt-get update
+            # bullseye moves to archive.debian.org once it's no longer supported
+            if ! apt-get update; then
+              sed -i -e 's|deb.debian.org|archive.debian.org|g' -e '/security/d' /etc/apt/sources.list
+              apt-get update
+            fi
             DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
               build-essential cmake ninja-build pkg-config libglfw3-dev libopenal-dev libmpg123-dev libsndfile1-dev
-            cmake -S . -B build32 -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
-            cmake --build build32
-            chown -R $(id -u):$(id -g) build32"
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
+            cmake --build build
+            chown -R $(id -u):$(id -g) build"
       - name: Package
         run: |
-          file build32/src/${GAME}
+          file build/src/${GAME}
           mkdir -p package
           cp -r gamefiles/. package/
-          cp build32/src/${GAME} package/
-          tar -czf ${GAME}-linux-x86.tar.gz -C package .
+          cp -r licenses package/
+          cp build/src/${GAME} package/
+          tar -czf ${GAME}-linux-${{ matrix.arch }}.tar.gz -C package .
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-x86
-          path: ${{ env.GAME }}-linux-x86.tar.gz
+          name: linux-${{ matrix.arch }}
+          path: ${{ env.GAME }}-linux-${{ matrix.arch }}.tar.gz
 
   windows:
     runs-on: windows-2022
@@ -117,6 +110,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force $env:PACKAGE | Out-Null
           Copy-Item -Recurse gamefiles/* $env:PACKAGE/
+          Copy-Item -Recurse licenses $env:PACKAGE/
           Copy-Item bin/$env:PLATFORM/Release/$env:GAME.exe $env:PACKAGE/
           # symbols, so crash offsets from the Windows event log can be mapped to source lines
           Copy-Item bin/$env:PLATFORM/Release/$env:GAME.pdb $env:PACKAGE/
@@ -128,34 +122,94 @@ jobs:
           name: windows-${{ matrix.arch }}-${{ matrix.renderer }}
           path: ${{ env.GAME }}-windows-${{ matrix.arch }}-${{ matrix.renderer }}.zip
 
-  macos-arm64:
-    runs-on: macos-14
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+            min_macos: "11.0"
+          - arch: x64
+            runner: macos-15-intel
+            cmake_arch: x86_64
+            min_macos: "10.15"
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Install dependencies
-        run: brew install ninja glfw openal-soft mpg123 dylibbundler
+      - name: Install tools
+        run: brew install ninja dylibbundler
+      # Homebrew's libraries only run on the macOS version of the runner, build them for older versions
+      - name: Build dependencies
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.min_macos }}
+        run: |
+          DEPS=$PWD/deps
+          curl -sSfL https://github.com/glfw/glfw/archive/refs/tags/$GLFW_VERSION.tar.gz | tar xz
+          cmake -S glfw-$GLFW_VERSION -B build-glfw -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$DEPS \
+            -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_DOCS=OFF
+          cmake --build build-glfw --target install
+          curl -sSfL https://github.com/kcat/openal-soft/archive/refs/tags/$OPENAL_VERSION.tar.gz | tar xz
+          cmake -S openal-soft-$OPENAL_VERSION -B build-openal -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$DEPS \
+            -DALSOFT_EXAMPLES=OFF -DALSOFT_UTILS=OFF -DALSOFT_TESTS=OFF
+          cmake --build build-openal --target install
+          curl -sSfL -o mpg123.tar.bz2 https://downloads.sourceforge.net/project/mpg123/mpg123/$MPG123_VERSION/mpg123-$MPG123_VERSION.tar.bz2 ||
+            curl -sSfL -o mpg123.tar.bz2 https://www.mpg123.de/download/mpg123-$MPG123_VERSION.tar.bz2
+          tar xjf mpg123.tar.bz2
+          (cd mpg123-$MPG123_VERSION && ./configure --prefix=$DEPS --disable-static && make -j4 && make install)
       - name: Build
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_arch || matrix.arch }} \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.min_macos }} -DCMAKE_PREFIX_PATH=$PWD/deps -DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=GLFW
           cmake --build build
+          otool -L build/src/${GAME}
       - name: Package
         run: |
-          mkdir -p package
+          APP=package/${GAME}.app
+          mkdir -p $APP/Contents/MacOS $APP/Contents/Frameworks
+          cp build/src/${GAME} $APP/Contents/MacOS/
+          cat > $APP/Contents/Info.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key><string>${GAME}</string>
+            <key>CFBundleIdentifier</key><string>io.github.ogstra.${GAME}</string>
+            <key>CFBundleName</key><string>${GAME}</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>${GITHUB_REF_NAME}</string>
+            <key>CFBundleVersion</key><string>${GITHUB_RUN_NUMBER}</string>
+            <key>LSMinimumSystemVersion</key><string>${{ matrix.min_macos }}</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          EOF
+          # ship the libraries (OpenAL Soft, GLFW, mpg123) inside the app
+          dylibbundler -od -b -x $APP/Contents/MacOS/${GAME} -d $APP/Contents/Frameworks -p @executable_path/../Frameworks/ -s $PWD/deps/lib
+          # bundling rewrote the libraries, sign everything again (ad-hoc, arm64 refuses to run unsigned code)
+          codesign --force --deep --sign - $APP
+          codesign --verify --deep --strict $APP
           cp -r gamefiles/. package/
-          cp build/src/${GAME} package/
-          # ship the Homebrew libraries (OpenAL Soft, GLFW, mpg123) next to the binary
-          dylibbundler -od -b -x package/${GAME} -d package/libs -p @executable_path/libs/
-          (cd package && zip -r -y ../${GAME}-macos-arm64.zip .)
+          cp -r licenses package/
+          cat > package/README-macOS.txt <<EOF
+          Copy ${GAME}.app and the other files into the folder of your PC copy of the game
+          (the one containing the models and data folders), then open ${GAME}.app.
+
+          The app isn't notarized by Apple. If macOS says it can't be opened, right click it
+          and choose Open, or run this in Terminal from the game folder:
+            xattr -dr com.apple.quarantine ${GAME}.app
+          EOF
+          (cd package && zip -r -y ../${GAME}-macos-${{ matrix.arch }}.zip .)
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-arm64
-          path: ${{ env.GAME }}-macos-arm64.zip
+          name: macos-${{ matrix.arch }}
+          path: ${{ env.GAME }}-macos-${{ matrix.arch }}.zip
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [linux-x64, linux-x86, windows, macos-arm64]
+    needs: [linux, windows, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
