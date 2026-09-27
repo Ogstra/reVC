@@ -422,7 +422,12 @@ CBoat::ProcessControl(void)
 		float fz = Pow(m_vecTurnRes.z, CTimer::GetTimeStep());
 		m_vecTurnSpeed = Multiply3x3(m_vecTurnSpeed, GetMatrix());	// invert - to local space
 		// TODO: figure this out
+#ifdef FIX_HIGH_FPS_BUGS
+		// the speed dependent part was applied once per frame without the time step
+		float magic = CTimer::ScaleFrameMultiplier(1.0f/(1000.0f * SQR(m_vecTurnSpeed.x) + 1.0f)) * fx;
+#else
 		float magic = 1.0f/(1000.0f * SQR(m_vecTurnSpeed.x) + 1.0f) * fx;
+#endif
 		m_vecTurnSpeed.y *= fy;
 		m_vecTurnSpeed.z *= fz;
 		float forceUp = (magic - 1.0f) * m_vecTurnSpeed.x * m_fTurnMass;
@@ -430,18 +435,29 @@ CBoat::ProcessControl(void)
 		CVector com = Multiply3x3(GetMatrix(), m_vecCentreOfMass);
 		ApplyTurnForce(CVector(0.0f, 0.0f, forceUp), com + GetForward());
 
+#ifdef FIX_HIGH_FPS_BUGS
+		// change of volume per 30 fps frame, everything below was tuned for that
+		m_nDeltaVolumeUnderWater = Clamp((m_fVolumeUnderWater-m_fPrevVolumeUnderWater)*10000/Max(CTimer::GetTimeStepFix(), 0.01f), -32767.0f, 32767.0f);
+#else
 		m_nDeltaVolumeUnderWater = (m_fVolumeUnderWater-m_fPrevVolumeUnderWater)*10000;
+#endif
 
 		// Falling into water
 		if(!onLand && bBoatInWater && GetUp().z > 0.0f && m_nDeltaVolumeUnderWater > 200){
 			DMAudio.PlayOneShot(m_audioEntityId, SOUND_CAR_SPLASH, m_nDeltaVolumeUnderWater);
 
-			float speedUp = m_vecMoveSpeed.MagnitudeSqr() * m_nDeltaVolumeUnderWater * 0.0004f;
+#ifdef FIX_HIGH_FPS_BUGS
+			// applied on every frame the boat sinks in, spread it over the frames of a 30 fps frame
+			float splashStep = Min(CTimer::GetTimeStepFix(), 1.0f);
+#else
+			float splashStep = 1.0f;
+#endif
+			float speedUp = m_vecMoveSpeed.MagnitudeSqr() * m_nDeltaVolumeUnderWater * 0.0004f * splashStep;
 			if(speedUp + m_vecMoveSpeed.z > pHandling->fBrakeDeceleration)
 				speedUp = pHandling->fBrakeDeceleration - m_vecMoveSpeed.z;
 			if(speedUp < 0.0f) speedUp = 0.0f;
 			float speedFwd = DotProduct(m_vecMoveSpeed, GetForward());
-			speedFwd *= -m_nDeltaVolumeUnderWater * 0.01f * pHandling->fTractionLoss;
+			speedFwd *= -m_nDeltaVolumeUnderWater * 0.01f * pHandling->fTractionLoss * splashStep;
 			CVector speed = speedFwd*GetForward() + CVector(0.0f, 0.0f, speedUp);
 			CVector splashImpulse = speed * m_fMass;
 			ApplyMoveForce(splashImpulse);
@@ -541,17 +557,25 @@ CBoat::ProcessControlInputs(uint8 pad)
 	if(m_nPadID > 3)
 		m_nPadID = 3;
 
-	m_fBrake += (CPad::GetPad(pad)->GetBrake()/255.0f - m_fBrake)*0.1f;
+#ifdef FIX_HIGH_FPS_BUGS
+	// these smooth the input once per frame, keep the 30 fps response time
+	float pedalLerp = CTimer::ScaleFrameLerp(0.1f);
+	float steerLerp = CTimer::ScaleFrameLerp(0.2f);
+#else
+	float pedalLerp = 0.1f;
+	float steerLerp = 0.2f;
+#endif
+	m_fBrake += (CPad::GetPad(pad)->GetBrake()/255.0f - m_fBrake)*pedalLerp;
 	m_fBrake = Clamp(m_fBrake, 0.0f, 1.0f);
 
 	if(m_fBrake < 0.05f){
 		m_fBrake = 0.0f;
-		m_fAccelerate += (CPad::GetPad(pad)->GetAccelerate()/255.0f - m_fAccelerate)*0.1f;
+		m_fAccelerate += (CPad::GetPad(pad)->GetAccelerate()/255.0f - m_fAccelerate)*pedalLerp;
 		m_fAccelerate = Clamp(m_fAccelerate, 0.0f, 1.0f);
 	}else
 		m_fAccelerate = -m_fBrake*0.2f;
 
-	m_fSteeringLeftRight += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteeringLeftRight)*0.2f;
+	m_fSteeringLeftRight += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteeringLeftRight)*steerLerp;
 	m_fSteeringLeftRight = Clamp(m_fSteeringLeftRight, -1.0f, 1.0f);
 
 	float steeringSq = m_fSteeringLeftRight < 0.0f ? -SQR(m_fSteeringLeftRight) : SQR(m_fSteeringLeftRight);
@@ -583,7 +607,12 @@ CBoat::ApplyWaterResistance(void)
 	if(m_vecMoveSpeed.z > 0.0f)
 		m_vecMoveSpeed.z *= fz;
 	else
+#ifdef FIX_HIGH_FPS_BUGS
+		// blending with 0.5 once per frame isn't time step independent, use the 30 fps factor
+		m_vecMoveSpeed.z *= CTimer::ScaleFrameMultiplier(0.5f + 0.5f*Pow(m_vecMoveRes.z/magic, 0.5f*CTimer::GetDefaultTimeStep()));
+#else
 		m_vecMoveSpeed.z *= (1.0f - fz)*0.5f + fz;
+#endif
 }
 
 RwObject*

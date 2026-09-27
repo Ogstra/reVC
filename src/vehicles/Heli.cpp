@@ -214,8 +214,15 @@ CHeli::ProcessControl(void)
 		vTargetDist = target - GetPosition();
 		m_fTargetZ = target.z;
 		if(m_pathState == 6){
+#ifdef FIX_HIGH_FPS_BUGS
+			// moves 1% of the way to the landing spot every 30 fps frame
+			float lerp = CTimer::ScaleFrameLerp(0.01f);
+			GetMatrix().GetPosition().x += (target.x - GetMatrix().GetPosition().x)*lerp;
+			GetMatrix().GetPosition().y += (target.y - GetMatrix().GetPosition().y)*lerp;
+#else
 			GetMatrix().GetPosition().x = GetMatrix().GetPosition().x*0.99f + target.x*0.01f;
 			GetMatrix().GetPosition().y = GetMatrix().GetPosition().y*0.99f + target.y*0.01f;
+#endif
 		}
 	}else{
 		vTargetDist = FindPlayerCoors() - GetPosition();
@@ -346,7 +353,11 @@ CHeli::ProcessControl(void)
 		}
 	}else
 		if(m_fTargetOffset >= 2.0f)
+#ifdef FIX_HIGH_FPS_BUGS
+			m_fTargetOffset -= 2.0f*CTimer::GetTimeStepFix();
+#else
 			m_fTargetOffset -= 2.0f;
+#endif
 
 	if(m_heliType == HELI_TYPE_CATALINA)
 		if(m_pathState == 9 || m_pathState == 11 || m_pathState == 10){

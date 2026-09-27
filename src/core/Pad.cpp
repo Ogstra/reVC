@@ -1428,10 +1428,19 @@ void CPad::Update(int16 pad)
 
 	ProcessPCSpecificStuff();
 
-	if ( ++iCurrHornHistory >= HORNHISTORY_SIZE )
-		iCurrHornHistory = 0;
+#ifdef FIX_HIGH_FPS_BUGS
+	// The history is used to tell a tap of the horn (toggles the siren) from holding it,
+	// by how many entries the button was down. Keep one entry per 30 fps frame.
+	if ( CTimer::GetLogicalFramesPassed() == 0 )
+		bHornHistory[iCurrHornHistory] = bHornHistory[iCurrHornHistory] || GetHorn();
+	else
+#endif
+	{
+		if ( ++iCurrHornHistory >= HORNHISTORY_SIZE )
+			iCurrHornHistory = 0;
 
-	bHornHistory[iCurrHornHistory] = GetHorn();
+		bHornHistory[iCurrHornHistory] = GetHorn();
+	}
 
 
 	if ( !bDisplayNoControllerMessage )

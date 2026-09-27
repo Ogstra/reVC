@@ -2431,7 +2431,12 @@ CPed::ProcessControl(void)
 				forceDir = m_vecDamageNormal;
 				forceDir.z = 0.0f;
 				if (!bIsStanding) {
+#ifdef FIX_HIGH_FPS_BUGS
+					// applied every frame while touching, and the speed isn't reset while not standing
+					forceDir *= 4.0f * CTimer::GetTimeStepFix();
+#else
 					forceDir *= 4.0f;
+#endif
 				} else {
 					forceDir *= 0.5f;
 				}
@@ -2543,6 +2548,10 @@ CPed::ProcessControl(void)
 						forceDir = m_vecDamageNormal;
 						forceDir.z = 0.0f;
 						forceDir.Normalise();
+#ifdef FIX_HIGH_FPS_BUGS
+						// applied every frame while in the air against a slope
+						forceDir *= CTimer::GetTimeStepFix();
+#endif
 						ApplyMoveForce(2.0f * forceDir);
 #else
 						if (m_nPedState == PED_JUMP) {
@@ -2556,6 +2565,10 @@ CPed::ProcessControl(void)
 						forceDir = m_vecDamageNormal;
 						forceDir.z = 0.0f;
 						forceDir.Normalise();
+#ifdef FIX_HIGH_FPS_BUGS
+						// applied every frame while in the air against a slope
+						forceDir *= CTimer::GetTimeStepFix();
+#endif
 						if (m_nPedState != PED_JUMP || m_nWaitTimer >= 300) {
 							ApplyMoveForce(2.0f * forceDir);
 						} else {
