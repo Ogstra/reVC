@@ -25,6 +25,10 @@ extern RwBool psCameraBeginUpdate(RwCamera *camera);
 extern RwImage *psGrabScreen(RwCamera *camera);
 
 extern void psMouseSetPos(RwV2d *pos);
+#if defined(FIX_BUGS) && defined(LIBRW) && defined(RW_D3D9)
+extern void psFrameSubmitted(void);
+extern void psWaitForPreviousFrame(void);
+#endif
 
 extern RwBool psSelectDevice();
 
