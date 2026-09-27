@@ -1,5 +1,6 @@
 #include "common.h"
 #include <time.h>
+#include "platform.h"
 #include "rpmatfx.h"
 #include "rphanim.h"
 #include "rpskin.h"
@@ -396,6 +397,9 @@ DoRWStuffEndOfFrame(void)
 	FlushObrsPrintfs();
 	RwCameraEndUpdate(Scene.camera);
 	RsCameraShowRaster(Scene.camera);
+#if defined(FIX_BUGS) && defined(LIBRW) && defined(RW_D3D9)
+	psFrameSubmitted();
+#endif
 #ifndef MASTER
 	char s[48];
 #ifdef THIS_IS_STUPID
@@ -1572,6 +1576,9 @@ Render2dStuffAfterFade(void)
 void
 Idle(void *arg)
 {
+#if defined(FIX_BUGS) && defined(LIBRW) && defined(RW_D3D9)
+	psWaitForPreviousFrame();
+#endif
 #ifdef ASPECT_RATIO_SCALE
 	CDraw::SetAspectRatio(CDraw::FindAspectRatio());
 #endif
