@@ -190,15 +190,22 @@ jobs:
           # bundling rewrote the libraries, sign everything again (ad-hoc, arm64 refuses to run unsigned code)
           codesign --force --deep --sign - $APP
           codesign --verify --deep --strict $APP
+          # also the plain binary for starting it from Terminal, with its own copy of the libraries in libs/
+          cp build/src/${GAME} package/${GAME}
+          dylibbundler -od -b -x package/${GAME} -d package/libs -p @executable_path/libs/ -s $PWD/deps/lib
+          codesign --force --sign - package/libs/*.dylib package/${GAME}
+          codesign --verify --strict package/${GAME}
           cp -r gamefiles/. package/
           cp -r licenses package/
           cat > package/README-macOS.txt <<EOF
           Copy ${GAME}.app and the other files into the folder of your PC copy of the game
-          (the one containing the models and data folders), then open ${GAME}.app.
+          (the one containing the models and data folders), then open ${GAME}.app,
+          or run ./${GAME} from Terminal in that folder.
 
-          The app isn't notarized by Apple. If macOS says it can't be opened, right click it
-          and choose Open, or run this in Terminal from the game folder:
-            xattr -dr com.apple.quarantine ${GAME}.app
+          The game isn't notarized by Apple. Before the first start, run this in Terminal
+          from the game folder, otherwise macOS blocks it or starts it from a temporary copy
+          that can't find the game data:
+            xattr -dr com.apple.quarantine ${GAME}.app ${GAME} libs
           EOF
           (cd package && zip -r -y ../${GAME}-macos-${{ matrix.arch }}.zip .)
       - uses: actions/upload-artifact@v4
