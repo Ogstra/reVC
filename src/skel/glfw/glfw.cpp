@@ -1923,6 +1923,19 @@ cursorEnterCB(GLFWwindow* window, int entered) {
 void
 windowFocusCB(GLFWwindow* window, int focused) {
 	WindowFocused = !!focused;
+#ifdef FIX_BUGS
+	// Like WM_ACTIVATEAPP on Windows: forget the input state. Key events that happen while another window
+	// or desktop (macOS Space) has focus never arrive, which left keys stuck and the controls unresponsive.
+	CPad::GetPad(0)->Clear(false);
+	CPad::GetPad(1)->Clear(false);
+	lshiftStatus = false;
+	rshiftStatus = false;
+	// and capture the cursor again when coming back
+	if (focused && !FrontEndMenuManager.m_bMenuActive) {
+		lastCursorMode = GLFW_CURSOR_DISABLED;
+		glfwSetInputMode(window, GLFW_CURSOR, lastCursorMode);
+	}
+#endif
 }
 
 void
