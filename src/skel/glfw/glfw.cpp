@@ -1875,6 +1875,37 @@ cursorCB(GLFWwindow* window, double xpos, double ypos) {
 #endif
 }
 
+#ifdef FIX_BUGS
+// milliseconds with sub-millisecond precision, for the frame limiter
+static double
+FrameLimiterTime(void)
+{
+#ifdef _WIN32
+	static LARGE_INTEGER freq;
+	LARGE_INTEGER counter;
+	if (freq.QuadPart == 0)
+		QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&counter);
+	return (double)counter.QuadPart * 1000.0 / (double)freq.QuadPart;
+#else
+	return psTimer();
+#endif
+}
+
+static void
+SleepMilliseconds(double ms)
+{
+#ifdef _WIN32
+	Sleep((DWORD)ms);
+#else
+	struct timespec ts;
+	ts.tv_sec = (time_t)(ms / 1000.0);
+	ts.tv_nsec = (long)((ms - ts.tv_sec * 1000.0) * 1000000.0);
+	nanosleep(&ts, nil);
+#endif
+}
+#endif
+
 void
 cursorEnterCB(GLFWwindow* window, int entered) {
 	PSGLOBAL(cursorIsInWindow) = !!entered;
@@ -2424,12 +2455,36 @@ main(int argc, char *argv[])
 					
 					case GS_PLAYING_GAME:
 					{
+#ifdef FIX_BUGS
+						// The cycle counter is in whole milliseconds outside of Windows, so frames were only started
+						// on the next whole millisecond (120 fps gave 111). Use a precise clock and a fixed
+						// schedule, so the frame rate averages exactly the limit.
+						if ( RwInitialised )
+						{
+							if (!CMenuManager::m_PrefsFrameLimiter) {
+								RsEventHandler(rsIDLE, (void *)TRUE);
+							} else {
+								static double nextFrameTime = 0.0;
+								double period = 1000.0 / Max(1, RsGlobal.maxFPS);
+								double now = FrameLimiterTime();
+								if (now >= nextFrameTime) {
+									// fell behind (loading, a slow frame): start the schedule again from now
+									nextFrameTime = now - nextFrameTime > period ? now + period : nextFrameTime + period;
+									RsEventHandler(rsIDLE, (void *)TRUE);
+								} else if (nextFrameTime - now > 2.0) {
+									// don't spin the whole wait
+									SleepMilliseconds(nextFrameTime - now - 1.5);
+								}
+							}
+						}
+#else
 						float ms = (float)CTimer::GetCurrentTimeInCycles() / (float)CTimer::GetCyclesPerMillisecond();
 						if ( RwInitialised )
 						{
 							if (!CMenuManager::m_PrefsFrameLimiter || (1000.0f / (float)RsGlobal.maxFPS) < ms)
 								RsEventHandler(rsIDLE, (void *)TRUE);
 						}
+#endif
 						break;
 					}
 				}
