@@ -1,6 +1,12 @@
 #define WITHWINDOWS
 #include "common.h"
 #include "crossplatform.h"
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 // Codes compatible with Windows and Linux
 #ifndef _WIN32
@@ -460,6 +466,20 @@ void CheckGameData(void)
 		return;
 	if(len >= 0 && len < (int)sizeof(msg))
 		snprintf(msg + len, sizeof(msg) - len, "\nCopy a complete PC installation of the game into this folder and run the game from there.\n");
+#ifndef _WIN32
+	// say which folder was searched, and why on macOS it may not be the one the app is in
+	char cwd[512];
+	if(getcwd(cwd, sizeof(cwd)) && len >= 0 && len < (int)sizeof(msg))
+		len += snprintf(msg + len, sizeof(msg) - len, "\nSearched folder: %s\n", cwd);
+#ifdef __APPLE__
+	char exePath[1024];
+	uint32_t exePathSize = sizeof(exePath);
+	if(_NSGetExecutablePath(exePath, &exePathSize) == 0 && strstr(exePath, "/AppTranslocation/") && len >= 0 && len < (int)sizeof(msg))
+		snprintf(msg + len, sizeof(msg) - len, "\nmacOS started the app from a temporary copy because it was downloaded from the internet, "
+			"so the game folder can't be found. Run this in Terminal from the game folder, then open the app again:\n"
+			"  xattr -dr com.apple.quarantine *.app\n");
+#endif
+#endif
 #ifdef _WIN32
 	MessageBoxA(nil, msg, "Game data not found", MB_OK | MB_ICONERROR);
 #else
